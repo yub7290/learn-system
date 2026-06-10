@@ -22,3 +22,10 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+.claude
+.idea
+/CLAUDE.md
+/yub-system/target/classes/mapper/log/SysAccessLogMapper.xml
+/yub-system/target/classes/mapper/menu/SysMenuMapper.xml
+/yub-system/target/classes/mapper/user/SysUserMapper.xml
