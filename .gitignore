@@ -26,6 +26,4 @@ replay_pid*
 .claude
 .idea
 /CLAUDE.md
-/yub-system/target/classes/mapper/log/SysAccessLogMapper.xml
-/yub-system/target/classes/mapper/menu/SysMenuMapper.xml
-/yub-system/target/classes/mapper/user/SysUserMapper.xml
+docs/superpowers
