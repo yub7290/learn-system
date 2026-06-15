@@ -27,3 +27,8 @@ replay_pid*
 .idea
 /CLAUDE.md
 docs/superpowers
+.superpowers
+.worktrees
+.reasonix
+.codegraph
+reasonix.toml
