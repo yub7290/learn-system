@@ -1,0 +1,94 @@
+<template>
+  <view class="tab-bar">
+    <view 
+      class="tab-item" 
+      v-for="(item, index) in tabList" 
+      :key="index"
+      :class="currentTab === index ? 'tab-active' : ''"
+      @click="switchTab(index)"
+    >
+      <view class="tab-icon-wrap">
+        <text class="tab-icon">{{ item.icon }}</text>
+      </view>
+      <text class="tab-text">{{ item.text }}</text>
+    </view>
+  </view>
+</template>
+
+<script lang="uts">
+export default {
+  props: {
+    currentTab: {
+      type: Number,
+      default: 0
+    }
+  },
+  data() {
+    return {
+      tabList: [
+        { icon: '🏠', text: '首页', path: '/pages/index/index' },
+        { icon: '📚', text: '课程', path: '/pages/course/course' },
+        { icon: '📝', text: '考试', path: '/pages/exam/exam' },
+        { icon: '👤', text: '我的', path: '/pages/mine/mine' }
+      ]
+    }
+  },
+  methods: {
+    switchTab(index: number) {
+      const path = this.tabList[index].path
+      uni.switchTab({
+        url: path
+      })
+    }
+  }
+}
+</script>
+
+<style scoped>
+.tab-bar {
+  display: flex;
+  background: #ffffff;
+  border-top: 1px solid #eeeeee;
+  padding-bottom: env(safe-area-inset-bottom);
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.tab-icon-wrap {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 3px;
+}
+
+.tab-icon {
+  font-size: 20px;
+}
+
+.tab-text {
+  font-size: 11px;
+  color: #666666;
+}
+
+.tab-active .tab-text {
+  color: #2563EB;
+}
+
+.tab-active .tab-icon {
+  color: #2563EB;
+}
+</style>

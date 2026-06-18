@@ -1,0 +1,22 @@
+{
+  "name": "learn-mobi",
+  "version": "1.0.0",
+  "description": "学生端学习 APP",
+  "scripts": {
+    "dev:h5": "uni",
+    "build:h5": "uni build"
+  },
+  "dependencies": {
+    "ai-tutor": "^1.0.7",
+    "face-api.js": "^0.22.2",
+    "sm-crypto": "^0.3.14"
+  },
+  "devDependencies": {
+    "@dcloudio/uni-app": "vue3",
+    "@dcloudio/uni-app-plus": "vue3",
+    "@dcloudio/uni-components": "vue3",
+    "@dcloudio/uni-h5": "vue3",
+    "@dcloudio/uni-mp-weixin": "vue3",
+    "vue": "^3.4.0"
+  }
+}

@@ -1,93 +1,72 @@
 <template>
   <scroll-view scroll-y class="page-wrap">
-    <!-- 顶部导航（永久渲染，不会消失） -->
-    <view class="top-nav">
-    
-      <text class="nav-title">{{ pageTitle }}</text>
-      <view class="icon-close" @click="goBack">×</view>
-    </view>
-
-    <!-- 无论ID是否合法，永久渲染基础布局，防止页面空白被销毁 -->
-    <view v-if="!isIdValid" class="error-full-layout">
-      <view class="status-bar">
-        <text>浏览0 / </text>
-        <text class="free-text">未获取课程</text>
-      </view>
-
-      <view class="banner-box empty-banner">
-        <text class="empty-banner-text">课程封面</text>
-      </view>
-
-      <!-- 功能图标两行四列永久渲染 -->
-      <view class="func-container">
-        <view class="func-item" v-for="(item, idx) in funcList" :key="idx">
-          <view class="func-icon">
-            <text class="badge" v-if="item.badge > 0">{{ item.badge }}</text>
-            <text class="icon-txt">{{ item.iconText }}</text>
-          </view>
-          <text class="func-name">{{ item.name }}</text>
+    <!-- 自定义导航栏 -->
+    <view class="navbar">
+      <view class="navbar-content">
+        <view class="back-btn" @click="goBack">
+          <text class="css-icon-back" style="color: #FFFFFF;"></text>
         </view>
-      </view>
-
-      <!-- Tab栏永久渲染 -->
-      <view class="tab-bar">
-        <view 
-          class="tab-item"
-          v-for="(tab, idx) in tabList"
-          :key="idx"
-          :class="currentTab === idx ? 'tab-active' : ''"
-          @click="switchTab(idx)"
-        >
-          {{ tab.name }}
-        </view>
-      </view>
-
-      <!-- 居中错误提示 -->
-      <view class="content-container">
-        <view class="center-error">
-          <text class="error-text">课程ID无效，请从课程列表正常进入</text>
-        </view>
+        <text class="navbar-title">{{ pageTitle }}</text>
+        <view class="navbar-right"></view>
       </view>
     </view>
 
-    <!-- ID合法正常业务布局 -->
+    <!-- ID无效时的占位 -->
+    <view v-if="!isIdValid" class="error-state">
+      <text class="iconfont error-icon">&#xe62c;</text>
+      <text class="error-text">课程ID无效，请从课程列表正常进入</text>
+    </view>
+
+    <!-- 正常课程内容 -->
     <template v-else>
-      <view class="status-bar">
-        <text>浏览{{ courseInfo.viewNum }} / </text>
-        <text class="free-text" v-if="courseInfo.freeFlag">免费</text>
-      </view>
-
-      <view class="banner-box">
-        <image class="banner-img" :src="courseInfo.bannerImg" mode="widthFix"></image>
-        <view class="banner-back" @click="goBack">
-          <text class="arrow">〈</text>
-          <text class="banner-title">{{ courseInfo.title }}</text>
-        </view>
-      </view>
-
-      <view class="func-container">
-        <view class="func-item" v-for="(item, idx) in funcList" :key="idx" @click="clickFunc(idx)">
-          <view class="func-icon">
-            <text class="badge" v-if="item.badge > 0">{{ item.badge }}</text>
-            <text class="icon-txt">{{ item.iconText }}</text>
+      <!-- 课程封面 -->
+      <view class="cover-section">
+        <image class="cover-img" :src="courseInfo.bannerImg || '/static/logo.png'" mode="aspectFill"></image>
+        <view class="cover-overlay">
+          <view class="cover-info">
+            <text class="cover-title">{{ courseInfo.title }}</text>
+            <view class="cover-meta">
+              <text class="meta-item">{{ courseInfo.viewNum }}人浏览</text>
+              <text class="meta-tag" v-if="courseInfo.freeFlag">免费</text>
+            </view>
           </view>
-          <text class="func-name">{{ item.name }}</text>
         </view>
       </view>
 
-      <view class="tab-bar">
-        <view 
-          class="tab-item"
-          v-for="(tab, idx) in tabList"
-          :key="idx"
-          :class="currentTab === idx ? 'tab-active' : ''"
-          @click="switchTab(idx)"
-        >
-          {{ tab.name }}
+      <!-- 功能入口 -->
+      <view class="func-section">
+        <view class="func-grid">
+          <view class="func-item" v-for="(item, idx) in funcList" :key="idx" @click="clickFunc(idx)">
+            <view class="func-icon-wrap">
+              <text class="iconfont func-icon">{{ item.iconCode }}</text>
+              <view class="func-badge" v-if="item.badge > 0">
+                <text class="badge-text">{{ item.badge }}</text>
+              </view>
+            </view>
+            <text class="func-name">{{ item.name }}</text>
+          </view>
         </view>
       </view>
 
-      <view class="content-container">
+      <!-- Tab 标签 -->
+      <view class="tab-section">
+        <view class="tab-list">
+          <view 
+            class="tab-item"
+            v-for="(tab, idx) in tabList"
+            :key="idx"
+            :class="currentTab === idx ? 'tab-active' : ''"
+            @click="switchTab(idx)"
+          >
+            <text class="tab-text">{{ tab.name }}</text>
+            <view class="tab-indicator" v-if="currentTab === idx"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- Tab 内容 -->
+      <view class="content-section">
+        <!-- 章节列表 -->
         <view v-if="currentTab === 1" class="chapter-list">
           <view 
             class="chapter-item" 
@@ -95,34 +74,340 @@
             :key="idx"
             @click="openStudy(ch.id)"
           >
-            <text class="chapter-name">{{ idx + 1 }}.{{ ch.name }}</text>
-            <view class="btn-study">学习</view>
+            <view class="chapter-index">{{ idx + 1 }}</view>
+            <text class="chapter-name">{{ ch.name }}</text>
+            <view class="chapter-btn">
+              <text class="btn-text">学习</text>
+            </view>
           </view>
-          <view v-if="chapterList.length === 0" class="empty-tip">暂无章节数据</view>
+          <view v-if="chapterList.length === 0" class="empty-state">
+            <text class="empty-text">暂无章节数据</text>
+          </view>
         </view>
 
+        <!-- 课程介绍 -->
         <view v-if="currentTab === 0" class="text-content">
-          {{ courseInfo.desc || "暂无课程介绍" }}
+          <text class="content-text">{{ courseInfo.desc || "暂无课程介绍" }}</text>
         </view>
 
+        <!-- 学习目标 -->
         <view v-if="currentTab === 2" class="text-content">
-          {{ courseInfo.target || "暂无学习目标" }}
+          <text class="content-text">{{ courseInfo.target || "暂无学习目标" }}</text>
         </view>
 
-        <view v-if="currentTab === 3" class="teacher-content">
-          <image class="teacher-avatar" :src="teacherInfo.avatar" mode="aspectFill"></image>
-          <text class="teacher-name">{{ teacherInfo.name || "未知讲师" }}</text>
-          <text class="teacher-desc">{{ teacherInfo.intro || "暂无讲师简介" }}</text>
+        <!-- 讲师信息 -->
+        <view v-if="currentTab === 3" class="teacher-section">
+          <view class="teacher-card">
+            <image class="teacher-avatar" :src="teacherInfo.avatar || '/static/logo.png'" mode="aspectFill"></image>
+            <view class="teacher-info">
+              <text class="teacher-name">{{ teacherInfo.name || "未知讲师" }}</text>
+              <text class="teacher-desc">{{ teacherInfo.intro || "暂无讲师简介" }}</text>
+            </view>
+          </view>
         </view>
       </view>
     </template>
 
-    <view class="footer-space"></view>
+    <view class="safe-bottom"></view>
   </scroll-view>
 </template>
 
-<!-- 引入外部脚本 -->
 <script src="./script/coursedeal.js" lang="uts"></script>
 
-<!-- 引入外部样式 -->
-<style scoped src="./styles/coursedeal.css"></style>
+<style scoped>
+.page-wrap {
+  min-height: 100vh;
+  background: #F5F7FA;
+}
+
+/* 导航栏 */
+.navbar {
+  background: linear-gradient(135deg, #4A90D9 0%, #6BB5FF 100%);
+  padding-top: env(safe-area-inset-top);
+}
+.navbar-content {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+}
+.back-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.back-icon {
+  font-size: 24px;
+  color: #FFFFFF;
+}
+.navbar-title {
+  flex: 1;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.navbar-right {
+  width: 36px;
+}
+
+/* 错误状态 */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 100px 0;
+}
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+.error-text {
+  font-size: 14px;
+  color: #94A3B8;
+}
+
+/* 课程封面 */
+.cover-section {
+  position: relative;
+  width: 100%;
+  height: 200px;
+}
+.cover-img {
+  width: 100%;
+  height: 200px;
+}
+.cover-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  padding: 20px 16px 16px;
+}
+.cover-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #FFFFFF;
+  display: block;
+  margin-bottom: 8px;
+}
+.cover-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.meta-item {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+.meta-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  background: #22C55E;
+  color: #FFFFFF;
+  border-radius: 10px;
+}
+
+/* 功能入口 */
+.func-section {
+  background: #FFFFFF;
+  margin: 12px 16px;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.func-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.func-item {
+  width: 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.func-icon-wrap {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  background: #EBF5FF;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.func-icon {
+  font-size: 20px;
+}
+.func-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #EF4444;
+  color: #FFFFFF;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+}
+.badge-text {
+  font-size: 10px;
+}
+.func-name {
+  font-size: 11px;
+  color: #64748B;
+}
+
+/* Tab 标签 */
+.tab-section {
+  background: #FFFFFF;
+  margin: 6px 16px 12px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.tab-list {
+  display: flex;
+}
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 0;
+  position: relative;
+}
+.tab-text {
+  font-size: 14px;
+  color: #64748B;
+}
+.tab-active .tab-text {
+  color: #4A90D9;
+  font-weight: 600;
+}
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  width: 24px;
+  height: 3px;
+  background: #4A90D9;
+  border-radius: 2px;
+}
+
+/* 内容区域 */
+.content-section {
+  padding: 0 16px;
+}
+
+/* 章节列表 */
+.chapter-list {
+  background: #FFFFFF;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.chapter-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  gap: 12px;
+}
+.chapter-item:not(:last-child) {
+  border-bottom: 1px solid #F1F5F9;
+}
+.chapter-index {
+  width: 28px;
+  height: 28px;
+  background: #EBF5FF;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4A90D9;
+  flex-shrink: 0;
+}
+.chapter-name {
+  flex: 1;
+  font-size: 14px;
+  color: #1E293B;
+}
+.chapter-btn {
+  padding: 6px 14px;
+  background: #EBF5FF;
+  border-radius: 16px;
+}
+.btn-text {
+  font-size: 12px;
+  color: #4A90D9;
+  font-weight: 500;
+}
+
+/* 文本内容 */
+.text-content {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.content-text {
+  font-size: 14px;
+  color: #64748B;
+  line-height: 1.6;
+}
+
+/* 讲师信息 */
+.teacher-section {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.teacher-card {
+  display: flex;
+  gap: 14px;
+}
+.teacher-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid #EBF5FF;
+  flex-shrink: 0;
+}
+.teacher-info {
+  flex: 1;
+}
+.teacher-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1E293B;
+  display: block;
+  margin-bottom: 6px;
+}
+.teacher-desc {
+  font-size: 13px;
+  color: #64748B;
+  line-height: 1.5;
+}
+
+/* 空状态 */
+.empty-state {
+  padding: 30px;
+  text-align: center;
+}
+.empty-text {
+  font-size: 14px;
+  color: #94A3B8;
+}
+
+.safe-bottom {
+  height: 20px;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+</style>

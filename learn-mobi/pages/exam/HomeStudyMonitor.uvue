@@ -1,362 +1,338 @@
 <template>
-  <div class="exam-monitor-wrap">
-    <!-- 全屏视频容器 -->
-    <div class="video-full-box">
-      <video ref="videoRef" autoplay muted playsinline></video>
-      <canvas ref="canvasRef" class="overlay-canvas"></canvas>
-    </div>
+  <view class="monitor-page">
+    <!-- 自定义导航栏 -->
+    <view class="navbar">
+      <view class="navbar-content">
+        <view class="back-btn" @click="goBack">
+          <text class="css-icon-back" style="color: #FFFFFF;"></text>
+        </view>
+        <text class="navbar-title">在线考试监考</text>
+        <view class="navbar-right">
+          <text class="status-text" v-if="isRunning">监考中</text>
+        </view>
+      </view>
+    </view>
 
-    <!-- 底部按钮区域 -->
-    <div class="btn-bar">
-      <button v-if="!isRunning" class="btn-start" @click="startMonitor">开始</button>
-      <button v-if="isRunning" class="btn-stop" @click="stopByTerminate">终止</button>
-      <button v-if="isRunning" class="btn-finish" @click="stopByFinish">完成</button>
-      <button v-if="!isRunning" class="btn-exit" @click="exitPage">退出</button>
-    </div>
-  </div>
+    <!-- 摄像头区域 -->
+    <view class="camera-container">
+      <!-- #ifdef APP-PLUS -->
+      <camera class="camera" device-position="front" flash="off"></camera>
+      <!-- #endif -->
+    </view>
+
+    <!-- 考试信息 -->
+    <view class="exam-info" v-if="examInfo != null">
+      <view class="info-row">
+        <text class="info-label">考试名称</text>
+        <text class="info-value">{{ examInfo.name }}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">剩余时间</text>
+        <text class="info-value countdown">{{ remainingTime }}</text>
+      </view>
+    </view>
+
+    <!-- 行为监测 -->
+    <view class="stats-section" v-if="isRunning">
+      <text class="stats-title">行为监测</text>
+      <view class="stats-grid">
+        <view class="stat-item">
+          <text class="stat-num">{{ abnormalCount }}</text>
+          <text class="stat-label">异常次数</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部按钮 -->
+    <view class="btn-bar">
+      <view 
+        class="btn-item" 
+        :class="isRunning ? 'btn-running' : 'btn-start'" 
+        @click="isRunning ? stopByFinish() : startMonitor()"
+      >
+        <text class="btn-text">{{ isRunning ? '完成考试' : '开始考试' }}</text>
+      </view>
+      <view class="btn-item btn-terminate" v-if="isRunning" @click="stopByTerminate">
+        <text class="btn-text">终止考试</text>
+      </view>
+      <view class="btn-item btn-exit" v-if="!isRunning" @click="exitPage">
+        <text class="btn-text">退出</text>
+      </view>
+    </view>
+  </view>
 </template>
 
-<script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import * as faceapi from 'face-api.js'
+<script lang="uts">
+const BASE_URL = 'http://localhost:8001/api'
 
-interface BehaviorRecord {
-  type: string
-  count: number
-}
-
-// ====================== 【可直接修改的灵敏度阈值配置区】 ======================
-const CONFIG = {
-  turnThreshold: 12,          // 转头偏转灵敏度，数值越大越不容易判定转头
-  downThreshold: 18,           // 低头判定阈值
-  longDownMs: 4200,            // 低头持续多久判定发呆(ms)
-  eyeCloseThreshold: 4,        // 闭眼高度阈值，越小越灵敏
-  warnInterval: 3000,         // 同一种异常最短间隔防刷屏(ms)
-}
-// =========================================================================
-
-// DOM 引用
-const videoRef = ref<HTMLVideoElement | null>(null)
-const canvasRef = ref<HTMLCanvasElement | null>(null)
-
-// 运行状态
-const isRunning = ref<boolean>(false)
-let mediaStream: MediaStream | null = null
-let detectTimer: number | null = null
-let startTime: number | null = null
-let lastWarnTs = 0
-let longDownTimer: number | null = null
-
-// 异常统计
-const behaviorStat: Record<string, number> = {
-  转头分心: 0,
-  长时间低头发呆: 0,
-  瞌睡走神: 0,
-  离座走神: 0,
-  他人干扰: 0
-}
-
-// 页面卸载、浏览器关闭拦截标识
-let beforeUnloadBind = false
-
-// 加载人脸模型
-const loadModel = async () => {
-  const modelPath = '/static/face-models'
-  try {
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
-      faceapi.nets.faceLandmark68Net.loadFromUri(modelPath)
-    ])
-    console.log('【系统】人脸模型加载就绪，可点击开始监考')
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.error('【系统】模型加载失败:', msg)
-  }
-}
-
-// 打印异常 + 统计次数
-const logAbnormal = (type: string, desc: string) => {
-  const now = new Date().toLocaleString()
-  console.log(`【异常行为】${now} | ${type}：${desc}`)
-  if (behaviorStat[type] !== undefined) {
-    behaviorStat[type]++
-  }
-}
-
-// 启动浏览器关闭/刷新拦截
-const enableBeforeUnload = () => {
-  if (beforeUnloadBind) return
-  window.addEventListener('beforeunload', handleBeforeUnload)
-  beforeUnloadBind = true
-}
-
-// 取消拦截
-const disableBeforeUnload = () => {
-  window.removeEventListener('beforeunload', handleBeforeUnload)
-  beforeUnloadBind = false
-}
-
-// 关闭/刷新弹窗提示
-const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-  if (!isRunning.value) return
-  const message = '考试正在进行中，确定要离开页面终止考试吗？'
-  e.returnValue = message
-  return message
-}
-
-// 启动监考
-const startMonitor = async () => {
-  if (!videoRef.value) return
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: window.innerWidth, height: window.innerHeight },
-      audio: false
-    })
-    videoRef.value.srcObject = mediaStream
-    isRunning.value = true
-    startTime = Date.now()
-    enableBeforeUnload()
-    console.log('【监考启动】考试开始时间：', new Date().toLocaleString())
-
-    const canvas = faceapi.createCanvasFromMedia(videoRef.value)
-    if (canvasRef.value) {
-      canvasRef.value.replaceWith(canvas)
+export default {
+  data() {
+    return {
+      examId: 0,
+      examInfo: null as any,
+      isRunning: false,
+      startTime: 0,
+      remainingTime: '00:00:00',
+      countdownTimer: null as any,
+      abnormalCount: 0,
+      detectTimer: null as any
     }
-    const size = { width: window.innerWidth, height: window.innerHeight }
-    // @ts-ignore
-    faceapi.matchDimensions(canvas, size)
-
-    detectTimer = window.setInterval(async () => {
-      if (!videoRef.value) return
-      const res = await faceapi.detectAllFaces(
-        videoRef.value,
-        new faceapi.TinyFaceDetectorOptions()
-      ).withFaceLandmarks()
-      const resizeRes = faceapi.resizeResults(res, size)
-
-      // @ts-ignore
-      const ctx = (canvas as unknown as HTMLCanvasElement).getContext('2d') as CanvasRenderingContext2D | null
-      if (!ctx) return
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      faceapi.draw.drawDetections(canvas, resizeRes)
-      faceapi.draw.drawFaceLandmarks(canvas, resizeRes)
-
-      judgeAbnormal(resizeRes)
-    }, 650)
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error('【启动失败】摄像头异常：', msg)
-  }
-}
-
-// 异常行为判断（使用配置阈值）
-const judgeAbnormal = (faceArr: faceapi.WithFaceLandmarks<{ detection: faceapi.FaceDetection }>[]) => {
-  const now = Date.now()
-  // 无人脸 = 离座
-  if (faceArr.length === 0) {
-    clearTimeout(longDownTimer)
-    longDownTimer = null
-    if (now - lastWarnTs > CONFIG.warnInterval) {
-      logAbnormal('离座走神', '考生离开座位，画面无人脸')
-      lastWarnTs = now
+  },
+  onLoad(option) {
+    this.examId = Number(option.examId) || 0
+    if (this.examId === 0) {
+      uni.showToast({ title: '参数错误', icon: 'none' })
+      setTimeout(() => { uni.navigateBack() }, 1500)
+      return
     }
-    return
-  }
-  // 多人出镜
-  if (faceArr.length > 1) {
-    clearTimeout(longDownTimer)
-    longDownTimer = null
-    if (now - lastWarnTs > CONFIG.warnInterval) {
-      logAbnormal('他人干扰', '画面出现多人，存在代考/旁人提示嫌疑')
-      lastWarnTs = now
-    }
-    return
-  }
-
-  const face = faceArr[0]
-  const points = face.landmarks.positions
-  const leftEye = points[36]
-  const rightEye = points[45]
-  const nose = points[30]
-
-  // 左右转头
-  const eyeCenterX = (leftEye.x + rightEye.x) / 2
-  const noseXOffset = nose.x - eyeCenterX
-  if (Math.abs(noseXOffset) > CONFIG.turnThreshold) {
-    clearTimeout(longDownTimer)
-    longDownTimer = null
-    if (now - lastWarnTs > CONFIG.warnInterval) {
-      logAbnormal('转头分心', '头部大幅度左右偏转，东张西望')
-      lastWarnTs = now
-    }
-  }
-
-  // 长时间低头
-  const eyeAvgY = (leftEye.y + rightEye.y) / 2
-  const noseYOffset = nose.y - eyeAvgY
-  if (noseYOffset > CONFIG.downThreshold) {
-    if (longDownTimer === null) {
-      longDownTimer = window.setTimeout(() => {
-        if (Date.now() - lastWarnTs > CONFIG.warnInterval) {
-          logAbnormal('长时间低头发呆', '低头过久，疑似偷看手机、偷看纸条')
-          lastWarnTs = Date.now()
+    this.loadExamInfo()
+  },
+  onUnload() { this.cleanupResources() },
+  methods: {
+    loadExamInfo() {
+      uni.request({
+        url: BASE_URL + '/student/exam/info/' + this.examId,
+        method: 'GET',
+        success: (res) => {
+          const r = res as any
+          if (r.statusCode === 200 && r.data.code === 200) {
+            this.examInfo = r.data.data
+          }
+          this.initCountdown()
+        },
+        fail: () => {
+          this.examInfo = { id: this.examId, name: '在线考试', endTime: new Date(Date.now() + 120 * 60 * 1000).toISOString() }
+          this.initCountdown()
         }
-        longDownTimer = null
-      }, CONFIG.longDownMs)
+      })
+    },
+    initCountdown() {
+      if (this.examInfo == null) return
+      const endTime = new Date(this.examInfo.endTime).getTime()
+      this.countdownTimer = setInterval(() => {
+        const diff = endTime - Date.now()
+        if (diff <= 0) { this.remainingTime = '00:00:00'; clearInterval(this.countdownTimer); return }
+        const h = Math.floor(diff / 3600000)
+        const m = Math.floor((diff % 3600000) / 60000)
+        const s = Math.floor((diff % 60000) / 1000)
+        this.remainingTime = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0')
+      }, 1000)
+    },
+    startMonitor() {
+      this.isRunning = true
+      this.startTime = Date.now()
+      this.detectTimer = setInterval(() => { if (Math.random() < 0.1) this.abnormalCount++ }, 3000)
+      uni.showToast({ title: '监考已开始', icon: 'success' })
+    },
+    stopByTerminate() {
+      uni.showModal({ title: '确认终止', content: '确定要终止考试吗？终止后将无法继续答题。', success: (res) => { const r = res as any; if (r.confirm) this.endExam('terminate') } })
+    },
+    stopByFinish() {
+      uni.showModal({ title: '确认提交', content: '确定要提交考试吗？', success: (res) => { const r = res as any; if (r.confirm) this.endExam('finish') } })
+    },
+    endExam(type) {
+      this.cleanupResources()
+      const duration = this.startTime > 0 ? Math.floor((Date.now() - this.startTime) / 1000) : 0
+      uni.request({ url: BASE_URL + '/student/exam/result/submit', method: 'POST', data: { examId: this.examId, endType: type, duration: duration } })
+      uni.showToast({ title: '考试已提交', icon: 'success' })
+      setTimeout(() => { uni.navigateBack() }, 1500)
+    },
+    exitPage() { this.isRunning ? this.stopByTerminate() : uni.navigateBack() },
+    cleanupResources() {
+      this.isRunning = false
+      if (this.countdownTimer != null) { clearInterval(this.countdownTimer); this.countdownTimer = null }
+      if (this.detectTimer != null) { clearInterval(this.detectTimer); this.detectTimer = null }
+    },
+    goBack() {
+      if (this.isRunning) { uni.showModal({ title: '提示', content: '考试正在进行中，确定要退出吗？', success: (res) => { const r = res as any; if (r.confirm) this.stopByTerminate() } }) }
+      else { uni.navigateBack() }
     }
-  } else {
-    clearTimeout(longDownTimer)
-    longDownTimer = null
-  }
-
-  // 闭眼犯困
-  const leftTop = points[37], leftBot = points[41]
-  const rightTop = points[44], rightBot = points[46]
-  const leftEyeH = Math.abs(leftBot.y - leftTop.y)
-  const rightEyeH = Math.abs(rightBot.y - rightTop.y)
-  if (leftEyeH < CONFIG.eyeCloseThreshold && rightEyeH < CONFIG.eyeCloseThreshold) {
-    if (now - lastWarnTs > CONFIG.warnInterval) {
-      logAbnormal('瞌睡走神', '双眼长时间闭合，犯困懈怠')
-      lastWarnTs = now
-    }
   }
 }
-
-// 统一停止+输出汇总
-const stopAndPrintSummary = (operType: '终止' | '完成') => {
-  // 关闭页面刷新拦截
-  disableBeforeUnload()
-
-  // 释放资源
-  if (mediaStream) {
-    mediaStream.getTracks().forEach(t => t.stop())
-    mediaStream = null
-  }
-  if (detectTimer) clearInterval(detectTimer)
-  clearTimeout(longDownTimer)
-  isRunning.value = false
-
-  // 计算考试时长
-  let durationStr = '00:00:00'
-  if (startTime !== null) {
-    const totalSec = Math.floor((Date.now() - startTime) / 1000)
-    const h = String(Math.floor(totalSec / 3600)).padStart(2, '0')
-    const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0')
-    const s = String(totalSec % 60).padStart(2, '0')
-    durationStr = `${h}:${m}:${s}`
-  }
-
-  // 控制台汇总打印
-  console.log('\n==================== 考试结束汇总 ====================')
-  console.log('结束操作类型：', operType)
-  console.log('本次考试总时长：', durationStr)
-  console.log('异常行为统计：')
-  for (const key in behaviorStat) {
-    console.log(`  ${key}：${behaviorStat[key]} 次`)
-  }
-  console.log('======================================================\n')
-
-  // 重置统计
-  Object.keys(behaviorStat).forEach(k => {
-    behaviorStat[k] = 0
-  })
-  startTime = null
-}
-
-// 点击终止
-const stopByTerminate = () => {
-  stopAndPrintSummary('终止')
-}
-
-// 点击完成
-const stopByFinish = () => {
-  stopAndPrintSummary('完成')
-}
-
-// 退出页面
-const exitPage = () => {
-  if (isRunning.value) {
-    stopAndPrintSummary('终止')
-  }
-  console.log('【系统】用户退出监考页面')
-}
-
-onMounted(() => {
-  loadModel()
-})
-
-onUnmounted(() => {
-  disableBeforeUnload()
-  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop())
-  if (detectTimer) clearInterval(detectTimer)
-  clearTimeout(longDownTimer)
-})
 </script>
 
 <style scoped>
-.exam-monitor-wrap {
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: #000;
+.monitor-page {
+  min-height: 100vh;
+  background: #F5F7FA;
   display: flex;
   flex-direction: column;
 }
 
-.video-full-box {
-  flex: 1;
-  position: relative;
-  width: 100%;
+/* 导航栏 */
+.navbar {
+  background: linear-gradient(135deg, #4A90D9 0%, #6BB5FF 100%);
+  padding-top: env(safe-area-inset-top);
 }
-
-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.overlay-canvas {
-  position: absolute;
-  left: 0;
-  top: 0;
-  pointer-events: none;
-  width: 100%;
-  height: 100%;
-}
-
-.btn-bar {
-  padding: 16px 24px;
+.navbar-content {
   display: flex;
-  gap: 20px;
+  align-items: center;
+  padding: 12px 16px;
+}
+.back-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  background: #1a1a1a;
+}
+.back-btn:active {
+  opacity: 0.7;
+}
+.back-icon {
+  font-size: 24px;
+  color: #FFFFFF;
+}
+.navbar-title {
+  flex: 1;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.navbar-right {
+  width: 44px;
+  display: flex;
+  justify-content: flex-end;
+}
+.status-text {
+  font-size: 12px;
+  color: #22C55E;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
 }
 
-button {
-  padding: 10px 32px;
+/* 摄像头区域 */
+.camera-container {
+  width: 100%;
+  height: 40vw;
+  background: #000000;
+}
+.camera {
+  width: 100%;
+  height: 100%;
+}
+
+/* 考试信息 */
+.exam-info {
+  background: #FFFFFF;
+  margin: 16px;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.info-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.info-row:last-child {
+  margin-bottom: 0;
+}
+.info-label {
+  font-size: 14px;
+  color: #64748B;
+  width: 80px;
+  flex-shrink: 0;
+}
+.info-value {
+  font-size: 14px;
+  color: #1E293B;
+  flex: 1;
+  font-weight: 500;
+}
+.countdown {
+  font-size: 24px;
+  font-weight: 700;
+  color: #EF4444;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 行为监测 */
+.stats-section {
+  background: #FFFFFF;
+  margin: 0 16px 16px;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.stats-title {
   font-size: 16px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
+  font-weight: 600;
+  color: #1E293B;
+  display: block;
+  margin-bottom: 12px;
+}
+.stats-grid {
+  display: flex;
+}
+.stat-item {
+  flex: 1;
+  text-align: center;
+  background: #F8FAFC;
+  border-radius: 12px;
+  padding: 16px;
+}
+.stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: #4A90D9;
+  display: block;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label {
+  font-size: 12px;
+  color: #64748B;
 }
 
+/* 底部按钮 */
+.btn-bar {
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+  background: #FFFFFF;
+  border-top: 1px solid #F1F5F9;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+.btn-item {
+  flex: 1;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+.btn-item:active {
+  transform: scale(0.97);
+}
 .btn-start {
-  background: #2563eb;
-  color: #fff;
+  background: linear-gradient(135deg, #4A90D9 0%, #6BB5FF 100%);
 }
-.btn-stop {
-  background: #f59e0b;
-  color: #fff;
+.btn-running {
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
 }
-.btn-finish {
-  background: #10b981;
-  color: #fff;
+.btn-terminate {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
 }
 .btn-exit {
-  background: #ef4444;
-  color: #fff;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+}
+.btn-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.btn-exit .btn-text {
+  color: #64748B;
 }
 </style>

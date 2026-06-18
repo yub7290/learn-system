@@ -1,32 +1,16 @@
-interface CateItem {
-  id: number
-  name: string
-  children: Array<CateItem>
-}
-interface CourseItem {
-  id: number
-  img: string
-  name: string
-  link: string
-  type: number
-}
+const BASE_URL = 'http://localhost:8001/api'
 
 export default {
   data() {
     return {
       drawerShow: false,
       searchKey: "",
-      tabList: [
-        { name: "推荐" },
-        { name: "热门" },
-        { name: "直播" },
-        { name: "免费" },
-        { name: "会员" }
-      ],
+      tabList: [{ name: "推荐" }, { name: "热门" }, { name: "直播" }, { name: "免费" }, { name: "会员" }],
       currentTab: 0,
-      cateList: [] as Array<CateItem>,
+      cateList: [] as Array<any>,
       currentCateId: 0,
-      courseList: [] as Array<CourseItem>
+      courseList: [] as Array<any>,
+      loading: false
     }
   },
   onShow() {
@@ -34,79 +18,67 @@ export default {
     this.getCourseData()
   },
   methods: {
-    toggleDrawer() {
-      this.drawerShow = !this.drawerShow
-    },
-    closeDrawer() {
-      this.drawerShow = false
-    },
-
-    selectCate(cateId: number, parentId: number) {
+    toggleDrawer() { this.drawerShow = !this.drawerShow },
+    closeDrawer() { this.drawerShow = false },
+    selectCate(cateId, parentId) {
       this.currentCateId = cateId
       this.closeDrawer()
       this.getCourseData()
     },
-
-    switchTab(idx: number) {
+    switchTab(idx) {
       this.currentTab = idx
       this.getCourseData()
     },
-
     getCateData() {
       uni.request({
-        url: "https://xxx.com/api/course/category",
+        url: BASE_URL + '/course/category',
+        method: 'GET',
         success: (res) => {
           const r = res as any
-          if (r.data.code === 200) {
-            this.cateList = r.data.data.list
+          if (r.statusCode === 200 && r.data.code === 200) {
+            this.cateList = r.data.data.list || []
           }
         },
-        fail: () => {
-          uni.showToast({ title: "分类加载失败", icon: "none" })
-        }
+        fail: () => { uni.showToast({ title: "分类加载失败", icon: "none" }) }
       })
     },
-
     getCourseData() {
-      const tabType = this.currentTab
-      const cateId = this.currentCateId
+      if (this.loading) return
+      this.loading = true
       uni.request({
-        url: `https://xxx.com/api/course/list?cateId=${cateId}&tabType=${tabType}`,
+        url: BASE_URL + '/course/list',
+        method: 'GET',
+        data: { cateId: this.currentCateId, tabType: this.currentTab },
         success: (res) => {
           const r = res as any
-          if (r.data.code === 200) {
-            this.courseList = r.data.data.list
+          if (r.statusCode === 200 && r.data.code === 200) {
+            this.courseList = r.data.data.list || []
           }
         },
-        fail: () => {
-          uni.showToast({ title: "课程加载失败", icon: "none" })
-        }
+        fail: () => { uni.showToast({ title: "课程加载失败", icon: "none" }) },
+        complete: () => { this.loading = false }
       })
     },
-
-    // 搜索方法
     doSearch() {
       const keyword = this.searchKey.trim()
-      if (!keyword) {
-        uni.showToast({ title: "请输入关键词", icon: "none" })
-        return
-      }
+      if (keyword.length === 0) { uni.showToast({ title: "请输入关键词", icon: "none" }); return }
+      this.loading = true
       uni.request({
-        url: `https://xxx.com/api/course/search?keyword=${keyword}&cateId=${this.currentCateId}&tabType=${this.currentTab}`,
+        url: BASE_URL + '/course/search',
+        method: 'GET',
+        data: { keyword: keyword, cateId: this.currentCateId, tabType: this.currentTab },
         success: (res) => {
           const r = res as any
-          if (r.data.code === 200) {
-            this.courseList = r.data.data.list
+          if (r.statusCode === 200 && r.data.code === 200) {
+            this.courseList = r.data.data.list || []
           }
         },
-        fail: () => {
-          uni.showToast({ title: "搜索失败", icon: "none" })
-        }
+        fail: () => { uni.showToast({ title: "搜索失败", icon: "none" }) },
+        complete: () => { this.loading = false }
       })
     },
-
-    goLink(url: string) {
-      if (!url) return
+    goLink(url) {
+      if (!url || url.length === 0) return
       uni.navigateTo({ url: url })
     }
   }

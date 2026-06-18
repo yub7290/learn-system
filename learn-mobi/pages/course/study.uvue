@@ -1,7 +1,9 @@
 <template>
   <view class="study-wrap">
     <!-- 左上角返回箭头 -->
-    <view class="page-back" @click="goBackCourse">〈</view>
+    <view class="page-back" @click="goBackCourse">
+      <text class="css-icon-back"></text>
+    </view>
 
     <!-- 左侧章节抽屉遮罩 -->
     <view class="mask" v-if="drawerShow" @click="closeDrawer"></view>

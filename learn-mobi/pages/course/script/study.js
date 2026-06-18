@@ -1,94 +1,45 @@
-// ====================== 类型定义 ======================
-interface ChapterItem {
-  id: number
-  chapterName: string
-  mediaSrc: string
-  mediaType: "video" | "live"
-  article: string
-  attachList: Array<AttachItem>
-}
-interface AttachItem {
-  id: number
-  fileName: string
-  fileSize: string
-  fileUrl: string
-}
-interface ChatMsg {
-  id: number
-  userName: string
-  content: string
-}
-interface StudyCache {
-  playSecond: number
-  totalStudySecond: number
-}
-interface OfflineRecord {
-  courseId: number
-  chapterId: number
-  playSecond: number
-  totalStudySecond: number
-}
+const BASE_URL = 'http://localhost:8001/api'
 
 export default {
   data() {
     return {
-      // 路由参数
       cid: 0,
       chId: 0,
       cacheKey: "",
-
-      // 播放器计时缓存
-      mediaType: "video" as "video" | "live",
+      mediaType: "video",
       mediaSrc: "",
       playProgress: 0,
       totalStudySecond: 0,
       studyTimer: null as any,
-
-      // 章节抽屉
       drawerShow: false,
-      chapterAllList: [] as Array<ChapterItem>,
+      chapterAllList: [] as Array<any>,
       currentChapterId: 0,
-
-      // 底部Tab
-      bottomTabList: [
-        { name: "章节列表" },
-        { name: "交流" },
-        { name: "学习内容" },
-        { name: "附件" },
-        { name: "返回课程" }
-      ],
-      currentBottomTab: 2, // 默认学习内容
-
-      // 页面内容
+      bottomTabList: [{ name: "章节列表" }, { name: "交流" }, { name: "学习内容" }, { name: "附件" }, { name: "返回课程" }],
+      currentBottomTab: 2,
       studyArticle: "",
-      attachList: [] as Array<AttachItem>,
-
-      // 聊天
+      attachList: [] as Array<any>,
       chatInput: "",
-      chatMsgList: [] as Array<ChatMsg>,
-
-      // ========== 拓展优化变量 ==========
-      uploadThrottleTimer: null as any, // 节流定时器
-      offlineQueue: [] as Array<OfflineRecord>, // 离线上报队列
-      minValidSecond: 10, // 最小有效时长10秒，小于则不上报
-      finishPercent: 0.9 // 90%进度标记章节完成
+      chatMsgList: [] as Array<any>,
+      chatPage: 1,
+      uploadThrottleTimer: null as any,
+      offlineQueue: [] as Array<any>,
+      minValidSecond: 10,
+      finishPercent: 0.9
     }
   },
-  onLoad(option: any) {
+  onLoad(option) {
     this.cid = Number(option.cid) || 0
     this.chId = Number(option.chId) || 0
-    this.cacheKey = `study_record_${this.cid}_${this.chId}`
+    this.cacheKey = 'study_record_' + this.cid + '_' + this.chId
 
-    // 1、读取本地播放缓存（断点续播）
-    const cache = uni.getStorageSync(this.cacheKey) as StudyCache
-    if (cache) {
-      this.playProgress = cache.playSecond
-      this.totalStudySecond = cache.totalStudySecond
+    const cache = uni.getStorageSync(this.cacheKey)
+    if (cache != null) {
+      this.playProgress = cache.playSecond || 0
+      this.totalStudySecond = cache.totalStudySecond || 0
     }
 
-    // 2、读取离线上报队列，联网自动批量提交
-    const offlineData = uni.getStorageSync("study_offline_queue") as Array<OfflineRecord>
-    if (Array.isArray(offlineData) && offlineData.length) {
+    const offlineData = uni.getStorageSync("study_offline_queue")
+    if (Array.isArray(offlineData) && offlineData.length > 0) {
       this.offlineQueue = offlineData
       this.batchUploadOffline()
     }
@@ -96,9 +47,7 @@ export default {
     this.getChapterDetail()
     this.getAllChapterList()
   },
-  onShow() {
-    this.startTimer()
-  },
+  onShow() { this.startTimer() },
   onHide() {
     this.pauseTimer()
     this.saveLocalCache()
@@ -110,16 +59,13 @@ export default {
     this.uploadStudyRecord(true)
   },
   onReady() {
-    // 页面加载完成检查离线队列
-    if (this.offlineQueue.length) this.batchUploadOffline()
+    if (this.offlineQueue.length > 0) this.batchUploadOffline()
   },
   methods: {
-    // ====================== 1、计时器控制（防重复创建） ======================
     startTimer() {
-      if (this.studyTimer) return
+      if (this.studyTimer != null) return
       this.studyTimer = setInterval(() => {
         this.totalStudySecond += 1
-        // 每30秒自动落盘缓存
         if (this.totalStudySecond % 30 === 0) {
           this.saveLocalCache()
           this.throttleUploadRecord()
@@ -127,27 +73,18 @@ export default {
       }, 1000)
     },
     pauseTimer() {
-      if (this.studyTimer) {
-        clearInterval(this.studyTimer)
-        this.studyTimer = null
-      }
+      if (this.studyTimer != null) { clearInterval(this.studyTimer); this.studyTimer = null }
     },
     clearAllTimer() {
       this.pauseTimer()
-      if (this.uploadThrottleTimer) {
-        clearTimeout(this.uploadThrottleTimer)
-        this.uploadThrottleTimer = null
-      }
+      if (this.uploadThrottleTimer != null) { clearTimeout(this.uploadThrottleTimer); this.uploadThrottleTimer = null }
     },
-
-    // ====================== 2、播放进度监听 & 章节完成标记 ======================
-    handleTimeUpdate(e: any) {
+    handleTimeUpdate(e) {
       if (this.mediaType === "live") return
       this.playProgress = Number(e.detail.currentTime.toFixed(0))
-      // 播放进度超过90%标记章节完成
       const totalDuration = e.detail.duration || 0
-      if (totalDuration && (this.playProgress / totalDuration) >= this.finishPercent) {
-        this.markChapterFinish()
+      if (totalDuration > 0 && (this.playProgress / totalDuration) >= this.finishPercent) {
+        uni.setStorageSync('chapter_finish_' + this.currentChapterId, true)
       }
     },
     handleVideoEnd() {
@@ -155,192 +92,161 @@ export default {
       this.pauseTimer()
       this.saveLocalCache()
       this.uploadStudyRecord()
-      // 播放完毕清空本地缓存
       uni.removeStorageSync(this.cacheKey)
     },
-    markChapterFinish() {
-      uni.setStorageSync(`chapter_finish_${this.currentChapterId}`, true)
-    },
-
-    // ====================== 3、本地持久化缓存 ======================
     saveLocalCache() {
-      const cacheData: StudyCache = {
-        playSecond: this.playProgress,
-        totalStudySecond: this.totalStudySecond
-      }
-      uni.setStorageSync(this.cacheKey, cacheData)
+      uni.setStorageSync(this.cacheKey, { playSecond: this.playProgress, totalStudySecond: this.totalStudySecond })
     },
-    clearChapterCache() {
-      uni.removeStorageSync(this.cacheKey)
-    },
-
-    // ====================== 4、节流上报（3秒防抖，避免频繁请求） ======================
+    clearChapterCache() { uni.removeStorageSync(this.cacheKey) },
     throttleUploadRecord() {
-      if (this.uploadThrottleTimer) return
+      if (this.uploadThrottleTimer != null) return
       this.uploadThrottleTimer = setTimeout(() => {
         this.uploadStudyRecord()
-        clearTimeout(this.uploadThrottleTimer)
-        this.uploadThrottleTimer = null
+        if (this.uploadThrottleTimer != null) { clearTimeout(this.uploadThrottleTimer); this.uploadThrottleTimer = null }
       }, 3000)
     },
-
-    // ====================== 5、核心上报 + 离线队列存储 ======================
-    uploadStudyRecord(isForce = false) {
-      if (!this.cid || !this.currentChapterId) return
-      // 最小有效时长过滤
+    uploadStudyRecord(isForce) {
+      if (this.cid === 0 || this.currentChapterId === 0) return
       if (!isForce && this.totalStudySecond < this.minValidSecond) return
 
-      const record: OfflineRecord = {
-        courseId: this.cid,
-        chapterId: this.currentChapterId,
-        playSecond: this.playProgress,
-        totalStudySecond: this.totalStudySecond
-      }
+      const record = { courseId: this.cid, chapterId: this.currentChapterId, playSecond: this.playProgress, totalStudySecond: this.totalStudySecond }
 
       uni.request({
-        url: "https://xxx.com/api/study/saveRecord",
-        method: "POST",
+        url: BASE_URL + '/student/study/saveRecord',
+        method: 'POST',
         data: record,
-        success: () => {
-          // 上报成功可清空本地时长（按需开启）
-          // this.totalStudySecond = 0
-          // this.saveLocalCache()
-        },
+        success: () => {},
         fail: () => {
-          // 网络失败存入离线队列
           this.offlineQueue.push(record)
           uni.setStorageSync("study_offline_queue", this.offlineQueue)
           uni.showToast({ title: "网络异常，记录已离线保存", icon: "none", duration: 1500 })
         }
       })
     },
-
-    // ====================== 6、离线队列批量上传 ======================
     batchUploadOffline() {
-      if (!this.offlineQueue.length) return
+      if (this.offlineQueue.length === 0) return
       const copyQueue = [...this.offlineQueue]
-      let successCount = 0
-      copyQueue.forEach((item, index) => {
+      let done = 0
+      copyQueue.forEach((item) => {
         uni.request({
-          url: "https://xxx.com/api/study/saveRecord",
-          method: "POST",
+          url: BASE_URL + '/study/saveRecord',
+          method: 'POST',
           data: item,
-          success: () => {
-            successCount++
-            // 全部上报成功清空队列
-            if (successCount === copyQueue.length) {
-              this.offlineQueue = []
-              uni.setStorageSync("study_offline_queue", [])
-              uni.showToast({ title: "离线学习记录同步完成", icon: "none" })
-            }
-          }
+          success: () => { done++; if (done === copyQueue.length) { this.offlineQueue = []; uni.setStorageSync("study_offline_queue", []) } },
+          fail: () => { done++ }
         })
       })
     },
-
-    // ====================== 7、章节切换逻辑（重置缓存+计时） ======================
-    switchChapter(ch: ChapterItem) {
+    switchChapter(ch) {
       this.pauseTimer()
       this.saveLocalCache()
       this.uploadStudyRecord(true)
-
-      // 切换章节清空旧缓存
       this.clearChapterCache()
 
-      // 重置新章节数据
       this.currentChapterId = ch.id
       this.mediaSrc = ch.mediaSrc
-      this.mediaType = ch.mediaType
-      this.cacheKey = `study_record_${this.cid}_${ch.id}`
+      this.mediaType = ch.mediaType || 'video'
+      this.cacheKey = 'study_record_' + this.cid + '_' + ch.id
 
-      // 读取新章节缓存
-      const cache = uni.getStorageSync(this.cacheKey) as StudyCache
-      if (cache) {
-        this.playProgress = cache.playSecond
-        this.totalStudySecond = cache.totalStudySecond
+      const cache = uni.getStorageSync(this.cacheKey)
+      if (cache != null) {
+        this.playProgress = cache.playSecond || 0
+        this.totalStudySecond = cache.totalStudySecond || 0
       } else {
         this.playProgress = 0
         this.totalStudySecond = 0
       }
 
       this.chatMsgList = []
-      this.studyArticle = ch.article
-      this.attachList = ch.attachList
+      this.chatPage = 1
+      this.studyArticle = ch.article || ''
+      this.attachList = ch.attachList || []
       this.startTimer()
       this.closeDrawer()
     },
-
-    // ====================== 抽屉控制 ======================
-    openDrawer() {
-      this.drawerShow = true
-    },
-    closeDrawer() {
-      this.drawerShow = false
-    },
-
-    // ====================== 底部Tab切换 ======================
-    handleTabClick(idx: number) {
-      if (idx === 4) {
-        uni.navigateBack()
-        return
-      }
-      if (idx === 0) {
-        this.openDrawer()
-        return
-      }
+    openDrawer() { this.drawerShow = true },
+    closeDrawer() { this.drawerShow = false },
+    handleTabClick(idx) {
+      if (idx === 4) { uni.navigateBack(); return }
+      if (idx === 0) { this.openDrawer(); return }
+      if (idx === 1) { this.loadChatHistory() }
       this.currentBottomTab = idx
     },
-
-    // ====================== 聊天模块 ======================
+    loadChatHistory() {
+      uni.request({
+        url: BASE_URL + '/chat/list',
+        method: 'GET',
+        data: { chapterId: this.currentChapterId, page: this.chatPage, pageSize: 20 },
+        success: (res) => {
+          const r = res as any
+          if (r.statusCode === 200 && r.data.code === 200 && r.data.data.list != null) {
+            this.chatMsgList = [...this.chatMsgList, ...r.data.data.list]
+          }
+        },
+        fail: () => {}
+      })
+    },
     sendChatMsg() {
       const text = this.chatInput.trim()
-      if (!text) return
-      this.chatMsgList.push({
-        id: Date.now(),
-        userName: "我",
-        content: text
+      if (text.length === 0) return
+      uni.request({
+        url: BASE_URL + '/chat/send',
+        method: 'POST',
+        data: { chapterId: this.currentChapterId, content: text },
+        success: (res) => {
+          const r = res as any
+          if (r.statusCode === 200) {
+            this.chatMsgList.push({ id: Date.now(), userName: "我", content: text, sendTime: new Date().toISOString() })
+            this.chatInput = ""
+          }
+        },
+        fail: () => { uni.showToast({ title: "发送失败", icon: "none" }) }
       })
-      this.chatInput = ""
     },
-
-    // ====================== 附件下载 ======================
-    downloadFile(file: AttachItem) {
+    downloadFile(file) {
+      uni.showLoading({ title: "下载中..." })
       uni.downloadFile({
         url: file.fileUrl,
         success: (res) => {
-          uni.saveFile({
-            tempFilePath: res.tempFilePath,
-            success: () => {
-              uni.showToast({ title: "下载完成" })
-            }
-          })
+          const r = res as any
+          if (r.statusCode === 200) {
+            uni.saveFile({ tempFilePath: r.tempFilePath, success: () => { uni.showToast({ title: "下载完成" }) }, fail: () => { uni.showToast({ title: "保存失败", icon: "none" }) } })
+          }
         },
-        fail: () => {
-          uni.showToast({ title: "下载失败", icon: "none" })
-        }
+        fail: () => { uni.showToast({ title: "下载失败", icon: "none" }) },
+        complete: () => { uni.hideLoading() }
       })
     },
-
-    // ====================== 接口请求 ======================
     getChapterDetail() {
       uni.request({
-        url: `https://xxx.com/api/chapter/detail?chId=${this.chId}&cid=${this.cid}`,
-        success: (res: any) => {
-          const data = res.data.data
-          this.currentChapterId = data.id
-          this.mediaSrc = data.mediaSrc
-          this.mediaType = data.mediaType
-          this.studyArticle = data.article
-          this.attachList = data.attachList
-        }
+        url: BASE_URL + '/student/chapter/detail',
+        method: 'GET',
+        data: { chId: this.chId, cid: this.cid },
+        success: (res) => {
+          const r = res as any
+          if (r.statusCode === 200 && r.data.code === 200) {
+            this.currentChapterId = r.data.data.id
+            this.mediaSrc = r.data.data.mediaSrc || ''
+            this.mediaType = r.data.data.mediaType || 'video'
+            this.studyArticle = r.data.data.article || ''
+            this.attachList = r.data.data.attachList || []
+          }
+        },
+        fail: () => { uni.showToast({ title: "章节加载失败", icon: "none" }) }
       })
     },
     getAllChapterList() {
       uni.request({
-        url: `https://xxx.com/api/chapter/list?cid=${this.cid}`,
-        success: (res: any) => {
-          this.chapterAllList = res.data.data.list
-        }
+        url: BASE_URL + '/student/chapter/list',
+        method: 'GET',
+        data: { cid: this.cid },
+        success: (res) => {
+          const r = res as any
+          if (r.statusCode === 200 && r.data.code === 200) {
+            this.chapterAllList = r.data.data.list || []
+          }
+        },
+        fail: () => { uni.showToast({ title: "章节列表加载失败", icon: "none" }) }
       })
     }
   }

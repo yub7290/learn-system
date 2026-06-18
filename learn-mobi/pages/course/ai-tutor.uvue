@@ -1,0 +1,131 @@
+<template>
+  <view class="chat-page">
+    <!-- 自定义导航栏 -->
+    <view class="navbar">
+      <view class="navbar-inner">
+        <view class="back-btn" @click="goBack">
+          <text class="css-icon-back" style="color: #333;"></text>
+        </view>
+        <text class="navbar-title">AI助教</text>
+        <view class="navbar-right"></view>
+      </view>
+    </view>
+
+    <!-- 消息列表区域 -->
+    <scroll-view 
+      class="message-list" 
+      scroll-y 
+      :scroll-into-view="scrollAnchor"
+      @scrolltoupper="loadMore"
+    >
+      <!-- 加载更多提示 -->
+      <view class="load-more" v-if="isLoadingMore">
+        <text class="load-more-text">加载中...</text>
+      </view>
+      <view class="load-more" v-else-if="!hasMore && messages.length > 0">
+        <text class="load-more-text">没有更多消息了</text>
+      </view>
+
+      <!-- 欢迎消息（空状态） -->
+      <view class="welcome-section" v-if="messages.length === 0 && !isLoading">
+        <view class="welcome-card">
+          <text class="welcome-title">你好！我是AI助教</text>
+          <text class="welcome-desc">有任何学习上的问题都可以问我</text>
+        </view>
+        <view class="quick-questions">
+          <view class="quick-btn" @click="sendQuickQuestion('这门课程的重点是什么？')">
+            <text class="quick-btn-text">这门课程的重点是什么？</text>
+          </view>
+          <view class="quick-btn" @click="sendQuickQuestion('请帮我总结一下学习内容')">
+            <text class="quick-btn-text">请帮我总结一下学习内容</text>
+          </view>
+          <view class="quick-btn" @click="sendQuickQuestion('有哪些学习建议？')">
+            <text class="quick-btn-text">有哪些学习建议？</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 消息列表 -->
+      <view class="message-item" v-for="(msg, idx) in messages" :key="idx" :id="'msg-' + idx">
+        <!-- 学生消息 -->
+        <view class="message-row user-row" v-if="msg.role === 'user'">
+          <view class="message-bubble user-bubble">
+            <!-- 媒体内容 -->
+            <image v-if="msg.mediaType === 'image' && msg.mediaUrl" :src="msg.mediaUrl" class="msg-media-img" mode="widthFix" @click="previewImage(msg.mediaUrl)" />
+            <video v-else-if="msg.mediaType === 'video' && msg.mediaUrl" :src="msg.mediaUrl" class="msg-media-video" />
+            <!-- 文本内容 -->
+            <text class="message-content" v-if="msg.content">{{ msg.content }}</text>
+          </view>
+        </view>
+        <!-- AI消息 -->
+        <view class="message-row ai-row" v-else>
+          <view class="ai-avatar">
+            <text class="iconfont ai-avatar-icon">&#xe610;</text>
+          </view>
+          <view class="message-bubble ai-bubble">
+            <text class="message-content">{{ msg.content }}</text>
+            <text class="streaming-cursor" v-if="msg.isStreaming">|</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- AI思考中 -->
+      <view class="message-item" v-if="isAiThinking" id="msg-thinking">
+        <view class="message-row ai-row">
+          <view class="ai-avatar">
+            <text class="iconfont ai-avatar-icon">&#xe610;</text>
+          </view>
+          <view class="message-bubble ai-bubble thinking-bubble">
+            <view class="thinking-dots">
+              <view class="dot"></view>
+              <view class="dot"></view>
+              <view class="dot"></view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 底部锚点 -->
+      <view id="msg-bottom" style="height: 1px;"></view>
+    </scroll-view>
+
+    <!-- 输入区域 -->
+    <view class="input-bar" :style="{ bottom: keyboardHeight + 'px' }">
+      <!-- 媒体预览 -->
+      <view class="media-preview" v-if="selectedMedia">
+        <image v-if="selectedMediaType === 'image'" :src="selectedMediaPreview" class="media-preview-img" mode="aspectFit" />
+        <video v-else-if="selectedMediaType === 'video'" :src="selectedMediaPreview" class="media-preview-video" />
+        <view class="media-remove" @click="removeMedia">
+          <text class="css-icon-close" style="color: #fff; font-size: 10px;"></text>
+        </view>
+      </view>
+      
+      <view class="input-wrap">
+        <view class="media-btn" @click="chooseMedia">
+          <text class="iconfont" style="font-size: 22px; color: #666;">&#xe610;</text>
+        </view>
+        <input 
+          class="input-field" 
+          v-model="inputText" 
+          :placeholder="selectedMedia ? '添加描述（可选）' : '输入你的问题...'" 
+          placeholder-class="input-placeholder"
+          :disabled="isSending"
+          confirm-type="send"
+          @confirm="sendMessage"
+          @focus="onInputFocus"
+          @blur="onInputBlur"
+        />
+        <view 
+          class="send-btn" 
+          :class="canSend ? 'send-btn-active' : 'send-btn-disabled'"
+          @click="sendMessage"
+        >
+          <text class="send-btn-text">发送</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script src="./script/ai-tutor.js"></script>
+<style src="./styles/ai-tutor.css"></style>

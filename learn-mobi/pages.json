@@ -2,92 +2,136 @@
   "pages": [
     {
       "path": "pages/index/index",
-      "style": {}
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/login/login",
+      "style": {
+        "navigationStyle": "custom"
+      }
     },
     {
       "path": "pages/course/course",
-      "style": {}
+      "style": {
+        "navigationStyle": "custom"
+      }
     },
     {
       "path": "pages/exam/exam",
-      "style": {}
+      "style": {
+        "navigationStyle": "custom"
+      }
     },
     {
       "path": "pages/mine/mine",
-      "style": {}
-	},
-	{
-		"path": "pages/teacher/teacher",
-		"style": {
-			"navigationBarTitleText": ""
-		}
-	},
-	{
-		"path": "pages/course/coursedeal",
-		"style": {
-			"navigationBarTitleText": ""
-		}
-	},
-	{
-		"path": "pages/course/study",
-		"style": {
-			"navigationBarTitleText": ""
-		}
-	},
-	{
-		"path": "pages/exam/HomeStudyMonitor",
-		"style": {
-			"navigationBarTitleText": ""
-		}
-	},
-	{
-		"path": "pages/course/text",
-		"style": {
-			"navigationBarTitleText": ""
-		}
-	},
-	{
-		"path": "pages/course/AIteacher",
-		"style": {
-			"navigationBarTitleText": ""
-		}
-	}
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/teacher/teacher",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/course/coursedeal",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/course/study",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/exam/HomeStudyMonitor",
+      "style": {
+        "navigationBarTitleText": ""
+      }
+    },
+    {
+      "path": "pages/course/text",
+      "style": {
+        "navigationBarTitleText": ""
+      }
+    },
+    {
+      "path": "pages/course/AIteacher",
+      "style": {
+        "navigationBarTitleText": ""
+      }
+    },
+    {
+      "path": "pages/exam/HomeStudyMonitor",
+      "style": {
+        "navigationBarTitleText": ""
+      }
+    },
+    {
+      "path": "pages/course/text",
+      "style": {
+        "navigationBarTitleText": ""
+      }
+    },
+    {
+      "path": "pages/course/AIteacher",
+      "style": {
+        "navigationBarTitleText": ""
+      }
+    },
+    {
+      "path": "pages/course/ai-tutor",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/exam/HomeStudyMonitor",
+      "style": {
+        "navigationStyle": "custom"
+      }
+    }
   ],
   "globalStyle": {
-    "navigationBarTextStyle": "black",
-        "navigationBarBackgroundColor": "#ffffff",
-        "backgroundColor": "#ffffff",
-        "backgroundColorContent": "#ffffff"
+    "navigationBarTextStyle": "white",
+    "navigationBarBackgroundColor": "#4A90D9",
+    "backgroundColor": "#F5F7FA",
+    "backgroundColorContent": "#F5F7FA"
   },
   "tabBar": {
-    "color": "#666666",
-    "selectedColor": "#007aff",
-    "borderStyle": "solid",
-    "backgroundColor": "#ffffff",
+    "color": "#94A3B8",
+    "selectedColor": "#4A90D9",
+    "borderStyle": "white",
+    "backgroundColor": "#FFFFFF",
     "list": [
       {
         "pagePath": "pages/index/index",
         "text": "首页",
-        "iconPath": "/static/tab/home.png",
-        "selectedIconPath": "/static/tab/home_active.png"
+        "iconPath": "static/tab/home.svg",
+        "selectedIconPath": "static/tab/home-active.svg"
       },
       {
         "pagePath": "pages/course/course",
         "text": "课程",
-        "iconPath": "/static/tab/course.png",
-        "selectedIconPath": "/static/tab/course_active.png"
+        "iconPath": "static/tab/course.svg",
+        "selectedIconPath": "static/tab/course-active.svg"
       },
       {
         "pagePath": "pages/exam/exam",
         "text": "考试",
-        "iconPath": "/static/tab/exam.png",
-        "selectedIconPath": "/static/tab/exam_active.png"
+        "iconPath": "static/tab/exam.svg",
+        "selectedIconPath": "static/tab/exam-active.svg"
       },
       {
         "pagePath": "pages/mine/mine",
         "text": "我的",
-        "iconPath": "/static/tab/mine.png",
-        "selectedIconPath": "/static/tab/mine.png"
+        "iconPath": "static/tab/mine.svg",
+        "selectedIconPath": "static/tab/mine-active.svg"
       }
     ]
   }

@@ -1,12 +1,12 @@
-/* 全局锁死页面，禁止整页上下滚动（核心修复） */
 page {
   margin: 0;
   padding: 0;
-  background-color: #ffffff;
+  background-color: #F5F7FA;
   width: 100vw;
   height: 100vh;
   overflow: hidden !important;
 }
+
 .page-wrap {
   width: 100vw;
   height: 100vh;
@@ -21,23 +21,24 @@ page {
   align-items: center;
   justify-content: space-between;
   height: 44px;
-  padding: 0 15px;
-  background-color: #ffffff;
+  padding: 0 16px;
+  background-color: #FFFFFF;
   box-sizing: border-box;
   flex-shrink: 0;
 }
 .icon-back, .icon-close {
   font-size: 22px;
-  color: #333;
+  color: #1E293B;
   width: 30px;
   text-align: center;
 }
 .nav-title {
   font-size: 16px;
-  color: #333;
+  font-weight: 600;
+  color: #1E293B;
 }
 
-/* 非法ID完整占位布局 */
+/* 错误状态 */
 .error-full-layout {
   width: 100%;
   flex-shrink: 0;
@@ -50,13 +51,13 @@ page {
   justify-content: center;
 }
 .error-text {
-  font-size: 15px;
-  color: #999;
+  font-size: 14px;
+  color: #94A3B8;
 }
 
 /* 空封面 */
 .empty-banner {
-  background: #f5f5f5;
+  background: #F1F5F9;
   height: 180px;
   display: flex;
   align-items: center;
@@ -64,25 +65,26 @@ page {
   flex-shrink: 0;
 }
 .empty-banner-text {
-  color: #aaa;
+  color: #94A3B8;
   font-size: 14px;
 }
 
 /* 浏览/免费行 */
 .status-bar {
-  padding: 8px 15px;
-  font-size: 14px;
-  color: #666;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #64748B;
   text-align: right;
   box-sizing: border-box;
   width: 100%;
   flex-shrink: 0;
 }
 .free-text {
-  color: #ff5500;
+  color: #22C55E;
+  font-weight: 500;
 }
 
-/* 课程大图 */
+/* 课程封面 */
 .banner-box {
   position: relative;
   width: 100%;
@@ -106,14 +108,15 @@ page {
 }
 .banner-title {
   margin-left: 6px;
+  font-weight: 500;
 }
 
-/* 功能区 Grid 两行四列 */
+/* 功能区 Grid */
 .func-container {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px 0;
-  padding: 15px 8px;
+  gap: 12px 0;
+  padding: 16px;
   width: 100%;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -125,38 +128,38 @@ page {
 }
 .func-icon {
   position: relative;
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
-  color: #333;
+  font-size: 24px;
+  background: #EBF5FF;
+  border-radius: 12px;
 }
 .badge {
   position: absolute;
   top: -4px;
-  right: 2px;
-  background-color: #f43f3b;
+  right: -4px;
+  background-color: #EF4444;
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   padding: 1px 5px;
   border-radius: 10px;
   min-width: 16px;
   text-align: center;
 }
 .func-name {
-  font-size: 13px;
-  color: #333;
-  margin-top: 4px;
+  font-size: 11px;
+  color: #64748B;
+  margin-top: 6px;
 }
 
-/* ========== 重点修复1：Tab强制横向排列，禁止纵向堆叠 ========== */
+/* Tab 标签 */
 .tab-bar {
   display: flex !important;
   flex-direction: row !important;
-  border-bottom: 1px solid #eeeeee;
-  background: #fff;
+  background: #FFFFFF;
   width: 100%;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -164,17 +167,34 @@ page {
 .tab-item {
   flex: 1;
   text-align: center;
-  line-height: 42px;
-  font-size: 15px;
-  color: #666;
+  line-height: 44px;
+  font-size: 14px;
+  color: #64748B;
+  position: relative;
 }
 .tab-active {
-  color: #d92929;
-  border-bottom: 2px solid #d92929;
-  font-weight: 500;
+  color: #4A90D9;
+  font-weight: 600;
+}
+.tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: #4A90D9;
+  border-radius: 2px;
+}
+.tab-normal {
+  color: #64748B;
+}
+.tab-inactive {
+  color: #64748B;
 }
 
-/* ========== 重点修复2：仅该区域可上下滚动，占满剩余高度 ========== */
+/* 内容区域 */
 .content-scroll-wrap {
   flex: 1;
   width: 100%;
@@ -183,46 +203,54 @@ page {
   box-sizing: border-box;
 }
 .content-container {
-  padding: 0 15px;
+  padding: 0 16px;
   width: 100%;
   box-sizing: border-box;
 }
 
+/* 章节列表 */
 .chapter-list {
-  padding: 10px 0;
+  padding: 8px 0;
 }
 .chapter-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
-  border-bottom: 1px solid #f2f2f2;
+  height: 52px;
+  padding: 0 4px;
+  border-bottom: 1px solid #F1F5F9;
 }
 .chapter-name {
-  font-size: 15px;
-  color: #333;
+  font-size: 14px;
+  color: #1E293B;
+  flex: 1;
 }
 .btn-study {
-  border: 1px solid #39c568;
-  color: #39c568;
-  font-size: 13px;
-  padding: 3px 10px;
-  border-radius: 3px;
+  padding: 4px 14px;
+  background: #EBF5FF;
+  color: #4A90D9;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 16px;
 }
 
+/* 空状态 */
 .empty-tip {
   text-align: center;
   padding: 40px 0;
   font-size: 14px;
-  color: #999;
-}
-.text-content {
-  padding: 15px 0;
-  font-size: 14px;
-  line-height: 1.8;
-  color: #444;
+  color: #94A3B8;
 }
 
+/* 文本内容 */
+.text-content {
+  padding: 16px 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #1E293B;
+}
+
+/* 讲师信息 */
 .teacher-content {
   padding: 20px 0;
   display: flex;
@@ -230,25 +258,27 @@ page {
   align-items: center;
 }
 .teacher-avatar {
-  width: 90px;
-  height: 90px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
+  border: 3px solid #EBF5FF;
 }
 .teacher-name {
   font-size: 16px;
-  font-weight: 500;
-  margin-top: 10px;
-  color: #333;
+  font-weight: 600;
+  margin-top: 12px;
+  color: #1E293B;
 }
 .teacher-desc {
-  font-size: 14px;
-  color: #666;
-  line-height: 1.7;
+  font-size: 13px;
+  color: #64748B;
+  line-height: 1.6;
   margin-top: 8px;
   text-align: center;
+  padding: 0 20px;
 }
 
-/* 滚动底部留白，防止遮挡底部元素 */
+/* 底部留白 */
 .footer-space {
   height: 80px;
 }

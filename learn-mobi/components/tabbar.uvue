@@ -57,7 +57,7 @@ export default {
   color: #666;
 }
 .tabbar-item.active {
-  color: #007aff;
+  color: #2563EB;
 }
 .tabbar-item image {
   width: 24px;

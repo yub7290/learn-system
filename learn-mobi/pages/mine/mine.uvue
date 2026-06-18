@@ -1,17 +1,377 @@
 <template>
-	<!-- #ifdef APP -->
-	<scroll-view style="flex:1">
-	<!-- #endif -->
-		
-	<!-- #ifdef APP -->
-	</scroll-view>
-	<!-- #endif -->
+  <view class="mine-page">
+    <!-- 白色导航栏 -->
+    <view class="navbar">
+      <view class="navbar-content">
+        <text class="navbar-title">我的</text>
+      </view>
+    </view>
+
+    <!-- 用户信息卡片 -->
+    <view class="user-section">
+      <view class="user-card" v-if="userInfo != null">
+        <view class="user-header">
+          <image class="user-avatar" :src="userInfo.avatar || '/static/logo.png'" mode="aspectFill"></image>
+          <view class="user-info">
+            <text class="user-name">{{ userInfo.nickname || userInfo.username }}</text>
+            <text class="user-no">学号：{{ userInfo.studentNo || '--' }}</text>
+          </view>
+        </view>
+      </view>
+      <view class="login-card" v-else @click="goToLogin">
+        <image class="default-avatar" src="/static/logo.png" mode="aspectFill"></image>
+        <text class="login-text">点击登录</text>
+        <text class="login-desc">登录后享受完整学习体验</text>
+      </view>
+    </view>
+
+    <!-- 学习统计 -->
+    <view class="stats-section" v-if="userInfo != null">
+      <view class="stat-card">
+        <text class="stat-num">{{ studyStats.courseCount }}</text>
+        <text class="stat-label">我的课程</text>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-card">
+        <text class="stat-num">{{ studyStats.studyHours }}</text>
+        <text class="stat-label">学习时长(h)</text>
+      </view>
+      <view class="stat-divider"></view>
+      <view class="stat-card">
+        <text class="stat-num">{{ studyStats.certCount }}</text>
+        <text class="stat-label">获得证书</text>
+      </view>
+    </view>
+
+    <!-- 功能菜单 -->
+    <view class="menu-section">
+      <view class="menu-group">
+        <view class="menu-item" @click="showTip">
+          <view class="menu-icon-wrap" style="background: #EBF5FF;">
+            <text class="iconfont menu-icon">&#xe62c;</text>
+          </view>
+          <text class="menu-name">我的课程</text>
+          <text class="css-icon-arrow-right menu-arrow"></text>
+        </view>
+        <view class="menu-item" @click="showTip">
+          <view class="menu-icon-wrap" style="background: #FEF3C7;">
+            <text class="iconfont menu-icon">&#xe623;</text>
+          </view>
+          <text class="menu-name">我的考试</text>
+          <text class="css-icon-arrow-right menu-arrow"></text>
+        </view>
+        <view class="menu-item" @click="showTip">
+          <view class="menu-icon-wrap" style="background: #DCFCE7;">
+            <text class="iconfont menu-icon">&#xe61b;</text>
+          </view>
+          <text class="menu-name">我的证书</text>
+          <text class="css-icon-arrow-right menu-arrow"></text>
+        </view>
+      </view>
+
+      <view class="menu-group">
+        <view class="menu-item" @click="showTip">
+          <view class="menu-icon-wrap" style="background: #FCE7F3;">
+            <text class="iconfont menu-icon">&#xe62e;</text>
+          </view>
+          <text class="menu-name">学习记录</text>
+          <text class="css-icon-arrow-right menu-arrow"></text>
+        </view>
+        <view class="menu-item" @click="showTip">
+          <view class="menu-icon-wrap" style="background: #E0F2FE;">
+            <text class="iconfont menu-icon">&#xe611;</text>
+          </view>
+          <text class="menu-name">消息通知</text>
+          <text class="css-icon-arrow-right menu-arrow"></text>
+        </view>
+      </view>
+
+      <view class="menu-group">
+        <view class="menu-item" @click="showTip">
+          <view class="menu-icon-wrap" style="background: #F1F5F9;">
+            <text class="iconfont menu-icon">&#xe632;</text>
+          </view>
+          <text class="menu-name">设置</text>
+          <text class="css-icon-arrow-right menu-arrow"></text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 退出登录 -->
+    <view class="logout-section" v-if="userInfo != null">
+      <button class="logout-btn" @click="handleLogout">
+        <text class="logout-text">退出登录</text>
+      </button>
+    </view>
+
+    <view class="safe-bottom"></view>
+  </view>
 </template>
 
-<script setup>
-		
+<script lang="uts">
+const BASE_URL = 'http://localhost:8001/api'
+
+export default {
+  data() {
+    return {
+      userInfo: null as any,
+      studyStats: { courseCount: 0, studyHours: 0, certCount: 0 }
+    }
+  },
+  onShow() {
+    this.loadUserInfo()
+  },
+  methods: {
+    loadUserInfo() {
+      const token = uni.getStorageSync('access_token') || ''
+      if (token != null && token !== '') {
+        this.userInfo = uni.getStorageSync('user_info') || null
+        this.loadStudyStats()
+      } else {
+        this.userInfo = null
+      }
+    },
+    loadStudyStats() {
+      const token = uni.getStorageSync('access_token') || ''
+      uni.request({
+        url: BASE_URL + '/student/study/stats',
+        method: 'GET',
+        header: { 'Authorization': 'Bearer ' + token },
+        success: (res) => {
+          const r = res as any
+          if (r.statusCode === 200 && r.data.code === 200) {
+            this.studyStats = {
+              courseCount: r.data.data.courseCount || 0,
+              studyHours: r.data.data.studyHours || 0,
+              certCount: r.data.data.certCount || 0
+            }
+          }
+        },
+        fail: () => {}
+      })
+    },
+    goToLogin() { uni.navigateTo({ url: '/pages/login/login' }) },
+    showTip() { uni.showToast({ title: '功能开发中', icon: 'none' }) },
+    handleLogout() {
+      uni.showModal({
+        title: '提示',
+        content: '确定要退出登录吗？',
+        success: (res) => {
+          const r = res as any
+          if (r.confirm) {
+            uni.removeStorageSync('access_token')
+            uni.removeStorageSync('refresh_token')
+            uni.removeStorageSync('user_info')
+            this.userInfo = null
+            this.studyStats = { courseCount: 0, studyHours: 0, certCount: 0 }
+            uni.showToast({ title: '已退出登录', icon: 'success' })
+          }
+        }
+      })
+    }
+  }
+}
 </script>
 
-<style>
-		
+<style scoped>
+.mine-page { 
+  min-height: 100vh; 
+  background: #F5F7FA; 
+}
+
+/* 白色导航栏 */
+.navbar { 
+  background: #FFFFFF; 
+  padding-top: env(safe-area-inset-top); 
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04); 
+}
+.navbar-content { 
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 16px; 
+}
+.navbar-title { 
+  font-size: 18px; 
+  font-weight: 600; 
+  color: #1E293B; 
+}
+
+/* 用户信息区域 */
+.user-section { 
+  background: linear-gradient(135deg, #4A90D9 0%, #6BB5FF 100%); 
+  margin-top: 1px;
+}
+.user-card { 
+  padding: 24px 20px; 
+}
+.user-header { 
+  display: flex; 
+  flex-direction: row;
+  align-items: center; 
+  gap: 14px; 
+}
+.user-avatar { 
+  width: 64px; 
+  height: 64px; 
+  border-radius: 50%; 
+  border: 3px solid rgba(255,255,255,0.3); 
+}
+.user-info { 
+  flex: 1; 
+}
+.user-name { 
+  font-size: 20px; 
+  font-weight: 600; 
+  color: #FFFFFF; 
+  display: block; 
+  margin-bottom: 4px; 
+}
+.user-no { 
+  font-size: 13px; 
+  color: rgba(255,255,255,0.7); 
+}
+
+/* 登录卡片 */
+.login-card { 
+  padding: 32px 20px; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  min-height: 44px; 
+}
+.login-card:active { 
+  opacity: 0.8; 
+}
+.default-avatar { 
+  width: 72px; 
+  height: 72px; 
+  border-radius: 50%; 
+  margin-bottom: 12px; 
+  border: 3px solid rgba(255,255,255,0.3); 
+}
+.login-text { 
+  font-size: 18px; 
+  font-weight: 600; 
+  color: #FFFFFF; 
+  margin-bottom: 4px; 
+}
+.login-desc { 
+  font-size: 13px; 
+  color: rgba(255,255,255,0.7); 
+}
+
+/* 学习统计 */
+.stats-section { 
+  display: flex; 
+  flex-direction: row;
+  margin: -16px 16px 16px; 
+  background: #FFFFFF; 
+  border-radius: 12px; 
+  padding: 20px 16px; 
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+  position: relative; 
+  z-index: 1; 
+}
+.stat-card { 
+  flex: 1; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  gap: 6px; 
+}
+.stat-num { 
+  font-size: 22px; 
+  font-weight: 700; 
+  color: #4A90D9; 
+  font-variant-numeric: tabular-nums; 
+}
+.stat-label { 
+  font-size: 12px; 
+  color: #64748B; 
+}
+.stat-divider { 
+  width: 1px; 
+  height: 32px; 
+  background: #F1F5F9; 
+  align-self: center; 
+}
+
+/* 功能菜单 */
+.menu-section { 
+  padding: 0 16px; 
+}
+.menu-group { 
+  background: #FFFFFF; 
+  border-radius: 12px; 
+  margin-bottom: 12px; 
+  overflow: hidden; 
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04); 
+}
+.menu-item { 
+  display: flex; 
+  flex-direction: row;
+  align-items: center; 
+  padding: 14px 16px; 
+  gap: 14px; 
+  min-height: 44px; 
+  transition: background 0.15s ease; 
+}
+.menu-item:active { 
+  background: #F8FAFC; 
+}
+.menu-item:not(:last-child) { 
+  border-bottom: 1px solid #F1F5F9; 
+}
+.menu-icon-wrap { 
+  width: 36px; 
+  height: 36px; 
+  border-radius: 10px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  flex-shrink: 0; 
+}
+.menu-icon { 
+  font-size: 18px; 
+  color: #4A90D9; 
+}
+.menu-name { 
+  flex: 1; 
+  font-size: 15px; 
+  color: #1E293B; 
+}
+.menu-arrow { 
+  color: #CBD5E1; 
+  flex-shrink: 0; 
+}
+
+/* 退出登录 */
+.logout-section { 
+  padding: 24px 16px; 
+}
+.logout-btn { 
+  width: 100%; 
+  height: 48px; 
+  background: #FFFFFF; 
+  border: 1px solid #E2E8F0; 
+  border-radius: 12px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  transition: background 0.15s ease; 
+}
+.logout-btn:active { 
+  background: #FEF2F2; 
+}
+.logout-text { 
+  font-size: 15px; 
+  color: #EF4444; 
+  font-weight: 500; 
+}
+
+.safe-bottom { 
+  height: 20px; 
+  padding-bottom: env(safe-area-inset-bottom); 
+}
 </style>
