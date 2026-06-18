@@ -1,0 +1,321 @@
+<template>
+  <view class="home" style="background-color: #fff;">
+    <!-- 顶部 Logo + 搜索栏 + 搜索按钮 -->
+    <view class="header">
+      <image class="logo" :src="logoUrl" mode="aspectFit"></image>
+      <view class="search-box">
+        <input class="search-input" placeholder="请输入关键词搜索" v-model="searchVal" />
+      </view>
+      <view class="search-btn" @click="doSearch">搜索</view>
+    </view>
+
+    <!-- Banner 区域 -->
+    <scroll-view scroll-x class="banner">
+      <view class="banner-item" v-for="(item, index) in bannerList" :key="index" @click="goLink(item.link)">
+        <image :src="item.img" mode="widthFix" class="banner-img"></image>
+      </view>
+    </scroll-view>
+
+    <!-- 功能导航按钮区 -->
+    <view class="nav-wrap">
+      <view class="nav-item" v-for="(item, index) in navList" :key="index" @click="goLink(item.link)">
+        <image class="nav-img" :src="item.img"></image>
+        <text class="nav-name">{{ item.name }}</text>
+      </view>
+    </view>
+
+    <!-- 优秀老师推荐 -->
+    <view class="teacher-wrap">
+      <view class="title">优秀老师推荐</view>
+      <scroll-view scroll-x class="teacher-list">
+        <view class="teacher-item" v-for="(item, index) in teacherList" :key="index" @click="goTeacherHome(item.id)">
+          <image class="teacher-avatar" :src="item.avatar"></image>
+          <text class="teacher-name">{{ item.name }}</text>
+          <view class="star">
+            <text v-for="s in 5" :key="s" :class="s <= item.star ? 'star-active' : ''">★</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <!-- 课程推荐区域 -->
+    <view class="course-wrap">
+      <view class="title">精选课程</view>
+      <view class="content-wrap">
+        <view class="empty-tip" v-if="courseList.length === 0">
+          没有更多了
+        </view>
+        <view class="course-list" v-else>
+          <course-card
+            v-for="item in courseList"
+            :key="item.id"
+            :img="item.img"
+            :name="item.name"
+            :link="item.link"
+            :type="item.type"
+            @click="goLink"
+          ></course-card>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script lang="uts">
+interface TeacherItem {
+  id: number
+  avatar: string
+  name: string
+  star: number
+}
+interface CourseItem {
+  id: number
+  img: string
+  name: string
+  link: string
+  type: number
+}
+
+export default {
+  data() {
+    return {
+      searchVal: "",
+      logoUrl: "/static/logo.png",
+      bannerList: [] as Array<{ img: string; link: string }>,
+      navList: [] as Array<{ img: string; name: string; link: string }>,
+      teacherList: [] as Array<TeacherItem>,
+      courseList: [] as Array<CourseItem>
+    }
+  },
+  onShow() {
+    this.getBaseData()
+  },
+  methods: {
+    getBaseData() {
+      // 首页基础数据
+      uni.request({
+        url: "https://xxx.com/api/home/base",
+        success: (res) => {
+          const r = res as any
+          if (r.data.code === 200) {
+            this.logoUrl = r.data.data.logo
+            this.bannerList = r.data.data.banner
+            this.navList = r.data.data.nav
+          }
+        },
+        fail: () => {
+          uni.showToast({ title: "数据加载失败", icon: "none" })
+        }
+      })
+
+      // 老师推荐
+      uni.request({
+        url: "https://xxx.com/api/home/teacher",
+        success: (res) => {
+          const r = res as any
+          if (r.data.code === 200) {
+            this.teacherList = r.data.data.list
+          }
+        },
+        fail: () => {
+          uni.showToast({ title: "数据加载失败", icon: "none" })
+        }
+      })
+
+      // 课程推荐
+      uni.request({
+        url: "https://xxx.com/api/home/course",
+        success: (res) => {
+          const r = res as any
+          if (r.data.code === 200) {
+            this.courseList = r.data.data.list
+          }
+        },
+        fail: () => {
+          uni.showToast({ title: "数据加载失败", icon: "none" })
+        }
+      })
+    },
+
+    // 搜索事件
+    doSearch() {
+      const keyword = this.searchVal.trim()
+      if (!keyword) {
+        uni.showToast({ title: "请输入搜索内容", icon: "none" })
+        return
+      }
+      // 替换为你的搜索接口
+      uni.request({
+        url: `https://xxx.com/api/home/search?keyword=${keyword}`,
+        success: (res) => {
+          const r = res as any
+          if (r.data.code === 200) {
+            this.courseList = r.data.data.list
+          }
+        },
+        fail: () => {
+          uni.showToast({ title: "搜索失败", icon: "none" })
+        }
+      })
+    },
+
+    goLink(url: string) {
+      if (!url) return
+      uni.navigateTo({ url: url })
+    },
+    goTeacherHome(teacherId: number) {
+      uni.navigateTo({
+        url: `/pages/teacher/teacher?tid=${teacherId}`
+      })
+    }
+  }
+}
+</script>
+
+<style scoped>
+page {
+  background: #fff;
+}
+.home {
+  padding-bottom: 60px;
+  min-height: 100vh;
+}
+
+/* 头部：LOGO + 输入框 + 搜索按钮 横向布局 */
+.header {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  padding: 15px;
+  gap: 10px;
+}
+.logo {
+  width: 50px;
+  height: 36px;
+  flex-shrink: 0;
+}
+.search-box {
+  flex: 1;
+  height: 36px;
+  background: #f5f5f5;
+  border-radius: 18px;
+  padding: 0 15px;
+}
+.search-input {
+  height: 100%;
+  font-size: 14px;
+}
+/* 搜索按钮样式 */
+.search-btn {
+  flex-shrink: 0;
+  padding: 0 14px;
+  height: 36px;
+  line-height: 36px;
+  background: #007aff;
+  color: #fff;
+  border-radius: 18px;
+  font-size: 14px;
+}
+
+/* 轮播Banner */
+.banner {
+  white-space: nowrap;
+  padding: 0 15px;
+}
+.banner-item {
+  display: inline-block;
+  width: 100%;
+  margin-right: 10px;
+}
+.banner-img {
+  border-radius: 8px;
+  width: 100%;
+}
+
+/* 功能导航 */
+.nav-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 20px 15px;
+}
+.nav-item {
+  width: 20%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.nav-img {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 6px;
+}
+.nav-name {
+  font-size: 12px;
+  color: #333;
+}
+
+/* 通用标题 */
+.title {
+  font-size: 16px;
+  font-weight: bold;
+  padding: 10px 15px;
+}
+
+/* 老师推荐 */
+.teacher-wrap {
+  margin-top: 10px;
+}
+.teacher-list {
+  padding: 0 15px;
+  white-space: nowrap;
+}
+.teacher-item {
+  display: inline-block;
+  text-align: center;
+  margin-right: 15px;
+}
+.teacher-avatar {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.teacher-name {
+  display: block;
+  font-size: 13px;
+  margin: 5px 0;
+}
+.star {
+  font-size: 14px;
+  color: #cccccc;
+}
+.star-active {
+  color: #ffb400;
+}
+
+/* 课程区域 + 空状态 */
+.course-wrap {
+  margin-top: 20px;
+}
+.content-wrap {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+.empty-tip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #999;
+  padding: 40px 0;
+}
+.course-list {
+  padding: 0 15px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+</style>
