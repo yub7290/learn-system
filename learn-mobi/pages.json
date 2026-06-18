@@ -39,6 +39,18 @@
 		"style": {
 			"navigationBarTitleText": ""
 		}
+	},
+	{
+		"path": "pages/course/text",
+		"style": {
+			"navigationBarTitleText": ""
+		}
+	},
+	{
+		"path": "pages/course/AIteacher",
+		"style": {
+			"navigationBarTitleText": ""
+		}
 	}
   ],
   "globalStyle": {
