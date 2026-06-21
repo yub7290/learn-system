@@ -1,0 +1,548 @@
+<template>
+  <view class="ai-assistant-page">
+    <!-- 顶部导航栏 -->
+    <view class="nav-bar">
+      <view class="nav-back" @click="goBack">‹</view>
+      <text class="nav-title">AI助教</text>
+      <view class="nav-right"></view>
+    </view>
+
+    <!-- 模式切换Tab -->
+    <view class="mode-tabs">
+      <view 
+        class="tab-item" 
+        :class="{active: currentMode === 'chat'}"
+        @click="switchMode('chat')">
+        对话模式
+      </view>
+      <view 
+        class="tab-item" 
+        :class="{active: currentMode === 'correct'}"
+        @click="switchMode('correct')">
+        作业批改
+      </view>
+    </view>
+
+    <!-- 聊天历史区域 -->
+    <scroll-view 
+      scroll-y 
+      class="chat-scroll"
+      :scroll-into-view="scrollToId"
+      scroll-with-animation>
+      <view class="message-list">
+        <view 
+          class="message-item" 
+          v-for="(msg, index) in messageList" 
+          :key="msg.id"
+          :id="'msg-' + index"
+          :class="msg.role === 'user' ? 'msg-right' : 'msg-left'">
+          <!-- AI头像 -->
+          <view v-if="msg.role === 'ai'" class="avatar ai-avatar">AI</view>
+          <!-- 消息内容 -->
+          <view class="msg-content">
+            <text v-if="msg.type === 'text'" class="msg-text">{{ msg.content }}</text>
+            <image v-if="msg.type === 'image'" :src="msg.content" class="msg-image" mode="widthFix" @click="previewImage(msg.content)"/>
+          </view>
+          <!-- 用户头像 -->
+          <view v-if="msg.role === 'user'" class="avatar user-avatar">我</view>
+        </view>
+
+        <!-- AI加载中 -->
+        <view v-if="isLoading" class="message-item msg-left" id="msg-loading">
+          <view class="avatar ai-avatar">AI</view>
+          <view class="msg-content">
+            <text class="msg-text">正在思考中...</text>
+          </view>
+        </view>
+        <view class="chat-bottom-space"></view>
+      </view>
+    </scroll-view>
+
+    <!-- 底部输入区域 -->
+    <view class="input-footer">
+      <!-- 对话模式 -->
+      <template v-if="currentMode === 'chat'">
+        <view class="chat-input-row">
+          <input 
+            class="text-input" 
+            v-model="inputText" 
+            placeholder="请输入你的问题"
+            confirm-type="send"
+            @confirm="sendTextMessage"/>
+          <view 
+            class="send-btn" 
+            :class="{disabled: !inputText.trim()}"
+            @click="sendTextMessage">
+            发送
+          </view>
+        </view>
+      </template>
+
+      <!-- 作业批改模式 -->
+      <template v-else>
+        <view class="correct-input-area">
+          <view v-if="selectedImage" class="image-preview-wrap">
+            <image :src="selectedImage" class="preview-image" mode="aspectFill"/>
+            <view class="delete-image" @click="clearImage">×</view>
+          </view>
+          <view class="correct-bottom-row">
+            <view class="correct-actions">
+              <view class="action-item" @click="chooseImage('camera')">
+                <text class="action-icon">📷</text>
+                <text class="action-text">拍照</text>
+              </view>
+              <view class="action-item" @click="chooseImage('album')">
+                <text class="action-icon">🖼️</text>
+                <text class="action-text">相册</text>
+              </view>
+            </view>
+            <view 
+              class="send-btn correct-send-btn"
+              :class="{disabled: !selectedImage}"
+              @click="sendCorrectMessage">
+              提交批改
+            </view>
+          </view>
+        </view>
+      </template>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref, nextTick } from 'vue'
+
+interface MessageItem {
+  id: number
+  role: string
+  type: string
+  content: string
+  time: string
+}
+
+const currentMode = ref<string>('chat')
+const inputText = ref<string>('')
+const selectedImage = ref<string>('')
+const isLoading = ref<boolean>(false)
+const scrollToId = ref<string>('')
+let msgIdCounter = 2
+
+const messageList = ref<MessageItem[]>([
+  {
+    id: 1,
+    role: 'ai',
+    type: 'text',
+    content: '你好，我是AI助教，有什么问题都可以问我哦~',
+    time: getCurrentTime()
+  }
+])
+
+function getCurrentTime(): string {
+  const date = new Date()
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  return `${h}:${m}`
+}
+
+function goBack(): void {
+  uni.navigateBack()
+}
+
+function scrollToBottom(): void {
+  nextTick(() => {
+    scrollToId.value = isLoading.value ? 'msg-loading' : `msg-${messageList.value.length - 1}`
+  })
+}
+
+function addMessage(role: string, type: string, content: string): void {
+  messageList.value.push({
+    id: msgIdCounter++,
+    role,
+    type,
+    content,
+    time: getCurrentTime()
+  })
+}
+
+function previewImage(src: string): void {
+  uni.previewImage({ urls: [src], current: src })
+}
+
+function switchMode(mode: string): void {
+  if (currentMode.value === mode || isLoading.value) return
+  currentMode.value = mode
+  inputText.value = ''
+  selectedImage.value = ''
+}
+
+function sendTextMessage(): void {
+  const text = inputText.value.trim()
+  if (!text || isLoading.value) return
+
+  addMessage('user', 'text', text)
+  inputText.value = ''
+  isLoading.value = true
+  scrollToBottom()
+  requestChatApi(text)
+}
+
+function requestChatApi(question: string): void {
+  setTimeout(() => {
+    addMessage('ai', 'text', `这是针对「${question}」的模拟回答，对接正式接口后会返回真实AI回复内容。`)
+    isLoading.value = false
+    scrollToBottom()
+  }, 1000)
+}
+
+function chooseImage(type: string): void {
+  const sourceType = type === 'camera' ? ['camera'] : ['album']
+  uni.chooseImage({
+    count: 1,
+    sourceType: sourceType,
+    sizeType: ['compressed'],
+    success: (res: any) => {
+      convertImageToBase64(res.tempFilePaths[0])
+    },
+    fail: () => {
+      uni.showToast({ title: '选择图片失败', icon: 'none' })
+    }
+  })
+}
+
+function convertImageToBase64(filePath: string): void {
+  uni.getFileSystemManager().readFile({
+    filePath: filePath,
+    encoding: 'base64',
+    success: (res: any) => {
+      selectedImage.value = `data:image/jpeg;base64,${res.data}`
+    },
+    fail: () => {
+      uni.showToast({ title: '图片处理失败', icon: 'none' })
+    }
+  })
+}
+
+function clearImage(): void {
+  selectedImage.value = ''
+}
+
+function sendCorrectMessage(): void {
+  if (!selectedImage.value || isLoading.value) return
+
+  addMessage('user', 'image', selectedImage.value)
+  const imageBase64 = selectedImage.value
+  selectedImage.value = ''
+  isLoading.value = true
+  scrollToBottom()
+
+  setTimeout(() => {
+    const mockResult = `【作业批改结果】
+1. 第2题计算错误：
+   错误原因：乘法分配律应用错误，漏乘常数项
+   正确思路：3×(x+2) = 3x + 6，而非3x+2
+
+2. 第5题单位错误：
+   错误原因：最终结果未换算成题目要求的平方米单位
+   正确思路：先统一单位计算，最终结果换算后为24.5㎡
+
+整体正确率75%，继续加油哦~`
+    addMessage('ai', 'text', mockResult)
+    isLoading.value = false
+    scrollToBottom()
+  }, 1500)
+}
+</script>
+
+<style scoped>
+/* 全局页面基础 */
+page {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: #f5f7fa;
+  margin: 0;
+  padding: 0;
+}
+
+.ai-assistant-page {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f5f7fa;
+  box-sizing: border-box;
+}
+
+/* ========== 顶部导航栏 ========== */
+.nav-bar {
+  flex-shrink: 0;
+  height: 88rpx;
+  padding-top: env(safe-area-inset-top);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 24rpx;
+  padding-right: 24rpx;
+  background: #fff;
+  border-bottom: 1rpx solid #eee;
+  box-sizing: content-box;
+}
+.nav-back {
+  font-size: 40rpx;
+  color: #333;
+  width: 60rpx;
+}
+.nav-title {
+  font-size: 32rpx;
+  font-weight: 500;
+  color: #333;
+}
+.nav-right {
+  width: 60rpx;
+}
+
+/* ========== 模式切换Tab ========== */
+.mode-tabs {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  background: #fff;
+  padding: 0 80rpx 20rpx;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+.tab-item {
+  font-size: 28rpx;
+  color: #666;
+  padding: 16rpx 20rpx;
+  position: relative;
+}
+.tab-item.active {
+  color: #409eff;
+  font-weight: 500;
+}
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40rpx;
+  height: 4rpx;
+  background: #409eff;
+  border-radius: 2rpx;
+}
+
+/* ========== 聊天滚动区域 ========== */
+.chat-scroll {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  height: 0;
+  overflow-y: auto;
+  padding: 20rpx 24rpx;
+  box-sizing: border-box;
+}
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+.chat-bottom-space {
+  height: 20rpx;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* 消息项 核心修复 */
+.message-item {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+.msg-left {
+  justify-content: flex-start;
+}
+.msg-right {
+  justify-content: flex-end;
+}
+
+/* 头像 */
+.avatar {
+  flex-shrink: 0;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  color: #fff;
+}
+.ai-avatar {
+  background: #409eff;
+}
+.user-avatar {
+  background: #67c23a;
+}
+
+/* 消息气泡 核心修复 */
+.msg-content {
+  max-width: calc(100% - 80rpx); /* 减去头像+间距宽度 */
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  line-height: 1.6;
+  box-sizing: border-box;
+  word-wrap: break-word;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+.msg-left .msg-content {
+  background: #fff;
+  color: #333;
+  border-top-left-radius: 4rpx;
+}
+.msg-right .msg-content {
+  background: #409eff;
+  color: #fff;
+  border-top-right-radius: 4rpx;
+}
+
+/* 文字 核心修复 */
+.msg-text {
+  font-size: 28rpx;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  word-wrap: break-word;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+}
+
+.msg-image {
+  max-width: 400rpx;
+  max-height: 500rpx;
+  border-radius: 8rpx;
+  display: block;
+}
+
+/* ========== 底部输入区域 ========== */
+.input-footer {
+  flex-shrink: 0;
+  width: 100%;
+  background: #fff;
+  border-top: 1rpx solid #eee;
+  padding: 20rpx 24rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+/* 对话输入行 */
+.chat-input-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+.text-input {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 24rpx;
+  background: #f5f7fa;
+  border-radius: 36rpx;
+  font-size: 28rpx;
+  color: #333;
+  box-sizing: border-box;
+}
+
+/* 按钮通用 */
+.send-btn {
+  height: 72rpx;
+  line-height: 72rpx;
+  padding: 0 40rpx;
+  background: #409eff;
+  color: #fff;
+  font-size: 28rpx;
+  border-radius: 36rpx;
+  text-align: center;
+  flex-shrink: 0;
+}
+.send-btn.disabled {
+  background: #b3d8ff;
+  opacity: 0.7;
+}
+
+/* 作业批改区 */
+.correct-input-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+.image-preview-wrap {
+  position: relative;
+  width: 160rpx;
+  height: 160rpx;
+  flex-shrink: 0;
+}
+.preview-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 8rpx;
+  object-fit: cover;
+}
+.delete-image {
+  position: absolute;
+  top: -12rpx;
+  right: -12rpx;
+  width: 36rpx;
+  height: 36rpx;
+  line-height: 32rpx;
+  text-align: center;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 28rpx;
+}
+.correct-bottom-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+}
+.correct-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 40rpx;
+  align-items: center;
+}
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+.action-icon {
+  font-size: 48rpx;
+}
+.action-text {
+  font-size: 24rpx;
+  color: #666;
+}
+.correct-send-btn {
+  width: 200rpx;
+}
+</style>

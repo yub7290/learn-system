@@ -31,4 +31,4 @@ docs/superpowers
 .worktrees
 .reasonix
 .codegraph
-reasonix.toml
+reasonix.toml.vscode/
