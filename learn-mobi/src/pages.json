@@ -1,29 +1,26 @@
 {
-  "pages": [
-    {
-      "path": "pages/index/index",
-      "style": {
-        "navigationBarTitleText": "首页",
-        "navigationStyle": "custom"
-      }
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^u--(.*)": "uview-plus/components/u-$1/u-$1.vue",
+      "^up-(.*)": "uview-plus/components/u-$1/u-$1.vue",
+      "^u-([^-].*)": "uview-plus/components/u-$1/u-$1.vue"
     }
+  },
+  "pages": [
+    { "path": "pages/index/index", "style": { "navigationBarTitleText": "首页", "navigationStyle": "custom" } },
+    { "path": "pages/course/course", "style": { "navigationBarTitleText": "课程", "navigationStyle": "custom" } },
+    { "path": "pages/ai/chat", "style": { "navigationBarTitleText": "AI助教", "navigationStyle": "custom" } },
+    { "path": "pages/exam/exam", "style": { "navigationBarTitleText": "考试", "navigationStyle": "custom" } },
+    { "path": "pages/mine/mine", "style": { "navigationBarTitleText": "我的", "navigationStyle": "custom" } },
+    { "path": "pages/login/login", "style": { "navigationBarTitleText": "登录", "navigationStyle": "custom" } },
+    { "path": "pages/course/detail", "style": { "navigationBarTitleText": "课程详情", "navigationStyle": "custom" } },
+    { "path": "pages/course/study", "style": { "navigationBarTitleText": "学习", "navigationStyle": "custom" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "智慧教育",
-    "navigationBarBackgroundColor": "#F8F8F8",
-    "backgroundColor": "#F8F8F8"
-  },
-  "tabBar": {
-    "color": "#999999",
-    "selectedColor": "#2979ff",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "black",
-    "list": [
-      {
-        "pagePath": "pages/index/index",
-        "text": "首页"
-      }
-    ]
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f5f7fa",
+    "backgroundColorContent": "#f5f7fa"
   }
 }
