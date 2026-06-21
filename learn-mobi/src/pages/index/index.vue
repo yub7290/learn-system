@@ -7,8 +7,11 @@
       </view>
     </view>
 
-    <view class="banner-wrap" v-if="bannerList.length">
-      <u-swiper :list="bannerList" indicator indicator-mode="line" radius="14" height="120" img-mode="aspectFill"></u-swiper>
+    <view class="banner-wrap">
+      <u-swiper v-if="bannerList.length" :list="bannerList" indicator indicator-mode="line" radius="14" height="120" img-mode="aspectFill"></u-swiper>
+      <view v-else class="banner-placeholder">
+        <text class="bp-text">智慧教育 · 学你所想</text>
+      </view>
     </view>
 
     <view class="nav-card" v-if="navList.length">
@@ -92,7 +95,7 @@ function goCourseDetail(item: HomeCourseItem) { uni.navigateTo({ url: `/pages/co
 .nav-item { width: 20%; display: flex; flex-direction: column; align-items: center; margin-bottom: 12px; }
 .nav-img { width: 38px; height: 38px; border-radius: 12px; }
 .nav-img.placeholder { background: $primary-bg; color: $primary; display: flex; align-items: center; justify-content: center; font-size: 13px; }
-.nav-name { font-size: 11px; color: $text-2; margin-top: 5px; }
+.nav-name { font-size: 11px; color: $text-2; margin-top: 5px; text-align: center; }
 .section { margin-top: 16px; padding: 0 14px; }
 .sec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .sec-title { font-size: 15px; font-weight: 700; color: $text-1; }
@@ -103,4 +106,6 @@ function goCourseDetail(item: HomeCourseItem) { uni.navigateTo({ url: `/pages/co
 .avatar.ph { background: #d6dde6; }
 .t-name { display: block; font-size: 12px; color: $text-1; margin-top: 6px; }
 .course-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.banner-placeholder { height: 120px; border-radius: 14px; background: linear-gradient(135deg, $primary, $primary-light); display: flex; align-items: center; justify-content: center; }
+.bp-text { color: #fff; font-size: 16px; font-weight: 600; opacity: .9; }
 </style>

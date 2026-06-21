@@ -9,12 +9,15 @@
 
     <view class="func-grid">
       <view class="func-item" v-for="(f, i) in funcList" :key="i" @click="clickFunc(i)">
-        <view class="func-icon" :class="{ accent: f.color === 'accent' }"><u-icon :name="f.icon" :color="f.color === 'accent' ? '#ff7847' : '#0195ff'" size="22"></u-icon></view>
+        <view class="func-icon" :class="{ accent: f.color === 'accent' }">
+          <view v-if="f.iconfont" :class="['iconfont', f.iconfont]" :style="{ fontSize: '22px', color: f.color === 'accent' ? '#ff7847' : '#0195ff' }"></view>
+          <u-icon v-else :name="f.icon" :color="f.color === 'accent' ? '#ff7847' : '#0195ff'" size="22"></u-icon>
+        </view>
         <text class="func-name">{{ f.name }}</text>
       </view>
     </view>
 
-    <u-tabs :list="tabList" :current="tabIndex" @click="tabIndex = $event" line-color="#0195ff" :active-style="{ color: '#0195ff', fontWeight: 600 }"></u-tabs>
+    <u-tabs :list="tabList" :current="tabIndex" @click="tabIndex = $event.index" line-color="#0195ff" :scrollable="false" :active-style="{ color: '#0195ff', fontWeight: 600 }"></u-tabs>
 
     <view class="content">
       <view v-if="tabIndex === 0" class="text-content">{{ info.course.desc || '暂无课程介绍' }}</view>
@@ -54,8 +57,8 @@ const funcList = [
   { name: '章节', icon: 'list', color: 'primary' },
   { name: '收藏', icon: 'bookmark', color: 'primary' },
   { name: '分享', icon: 'share', color: 'primary' },
-  { name: 'AI助教', icon: 'chat', color: 'primary' },
-  { name: '考试', icon: 'grid', color: 'accent' },
+  { name: 'AI助教', icon: 'chat', iconfont: 'icon-ai64', color: 'primary' },
+  { name: '考试', icon: 'grid', iconfont: 'icon-shijuan', color: 'accent' },
   { name: '笔记', icon: 'edit-pen', color: 'primary' },
   { name: '评价', icon: 'chat', color: 'primary' },
   { name: '资料', icon: 'attach', color: 'primary' },

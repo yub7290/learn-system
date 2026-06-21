@@ -5,7 +5,7 @@
       <u-search v-model="keyword" placeholder="搜索课程" :showAction="false" @search="doSearch" shape="round" bg-color="#f5f7fa"></u-search>
     </view>
 
-    <u-tabs :list="tabList" :current="tabIndex" @click="onTabClick" line-color="#0195ff" :active-style="{ color: '#0195ff', fontWeight: 600 }"></u-tabs>
+    <u-tabs :list="tabList" :current="tabIndex" @click="onTabClick" line-color="#0195ff" :scrollable="false" :active-style="{ color: '#0195ff', fontWeight: 600 }"></u-tabs>
 
     <view class="course-grid" v-if="courseList.length">
       <CourseCard v-for="item in courseList" :key="item.id" :item="item" @click="goDetail" />
@@ -71,7 +71,7 @@ async function loadList(reset = false) {
 onShow(() => { loadCategory(); loadList(true) })
 onReachBottom(() => { if (loadStatus.value === 'loadmore' && !keyword.value) { page.value++; loadList(false) } })
 
-function onTabClick(i: number) { tabIndex.value = i; loadList(true) }
+function onTabClick(_item: any, index: number) { tabIndex.value = index; loadList(true) }
 function selectCate(id: number) { currentCateId.value = id; drawerShow.value = false; loadList(true) }
 function doSearch() { loadList(true) }
 function goDetail(item: CourseListItem) { uni.navigateTo({ url: `/pages/course/detail?cid=${item.id}` }).catch(() => {}) }
