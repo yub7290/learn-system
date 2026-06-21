@@ -1,5 +1,5 @@
 import { BASE_URL, PUBLIC_PATHS } from '../env'
-import { getAccessToken, getRefreshToken, setTokens, clearTokens, redirectLogin } from '../utils/auth'
+import { getAccessToken, getRefreshToken, setTokens, redirectLogin } from '../utils/auth'
 import type { Response } from '../types/response'
 
 /** 续签队列:纯逻辑,可单测 */
@@ -12,7 +12,7 @@ export function createRefreshQueue() {
     startRefreshing: () => { refreshing = true },
     enqueueRetry: (fn: () => void) => { pending.push(fn) },
     /** ok=true 刷新成功:重放并清空;ok=false 刷新失败:清空不重放 */
-    flushRetries: async (ok: boolean) => {
+    flushRetries: (ok: boolean) => {
       const list = pending
       pending = []
       refreshing = false
@@ -37,6 +37,7 @@ function isPublic(url: string): boolean {
 }
 
 /** 调用刷新接口,返回是否成功 */
+// 故意直接用 uni.request 而非 request({skipAuth:true}),避免刷新接口自身 401 时陷入续签递归
 function doRefresh(): Promise<boolean> {
   const refreshToken = getRefreshToken()
   if (!refreshToken) return Promise.resolve(false)
@@ -46,7 +47,7 @@ function doRefresh(): Promise<boolean> {
       method: 'POST',
       success: (res: any) => {
         const r = res.data as Response<{ accessToken: string; refreshToken: string }>
-        if (r.code === 200 && r.data?.accessToken) {
+        if (r != null && typeof r === 'object' && r.code === 200 && r.data?.accessToken) {
           setTokens(r.data.accessToken, r.data.refreshToken)
           resolve(true)
         } else {
@@ -76,33 +77,43 @@ export function request<T = any>(opts: RequestOptions): Promise<T> {
         data,
         header: finalHeader,
         success: async (res: any) => {
-          const r = res.data as Response<T>
-          // 401 且该请求非刷新接口本身 → 尝试续签
-          if (res.statusCode === 401 && !url.startsWith('/student/auth/refresh')) {
-            if (queue.isRefreshing()) {
-              // 排队等刷新完成后重放
-              queue.enqueueRetry(() => {
+          try {
+            const r = res.data as Response<T>
+            // 401 且该请求非刷新接口本身 → 尝试续签
+            if (res.statusCode === 401 && !url.startsWith('/student/auth/refresh')) {
+              if (queue.isRefreshing()) {
+                // 排队等刷新完成后重放
+                queue.enqueueRetry(() => {
+                  request<T>(opts).then(resolve).catch(reject)
+                })
+                return
+              }
+              queue.startRefreshing()
+              const ok = await doRefresh()
+              await queue.flushRetries(ok)
+              if (ok) {
+                // 续签成功,重放本次
                 request<T>(opts).then(resolve).catch(reject)
-              })
+              } else {
+                redirectLogin()
+                reject(new Error('登录已过期,请重新登录'))
+              }
               return
             }
-            queue.startRefreshing()
-            const ok = await doRefresh()
-            await queue.flushRetries(ok)
-            if (ok) {
-              // 续签成功,重放本次
-              request<T>(opts).then(resolve).catch(reject)
-            } else {
-              redirectLogin()
-              reject(new Error('登录已过期,请重新登录'))
+            // 响应体格式校验:防止网关返回非 JSON(HTML 错误页等)导致 r.code 未定义
+            if (r == null || typeof r !== 'object' || typeof (r as any).code !== 'number') {
+              uni.showToast({ title: '服务器响应格式异常', icon: 'none' })
+              reject(new Error('invalid response body'))
+              return
             }
-            return
-          }
-          if (r.code === 200) {
-            resolve(r.data)
-          } else {
-            uni.showToast({ title: r.message || '请求失败', icon: 'none' })
-            reject(new Error(r.message || `code ${r.code}`))
+            if (r.code === 200) {
+              resolve(r.data)
+            } else {
+              uni.showToast({ title: r.message || '请求失败', icon: 'none' })
+              reject(new Error(r.message || `code ${r.code}`))
+            }
+          } catch (err) {
+            reject(err instanceof Error ? err : new Error(String(err)))
           }
         },
         fail: () => {
