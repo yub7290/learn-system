@@ -4,10 +4,16 @@
       <image class="avatar" :src="user.avatarUrl" v-if="user.avatarUrl"></image>
       <view class="avatar ph" v-else></view>
       <view class="user-info">
-        <text class="u-name">{{ user.name || '未登录' }}</text>
-        <text class="u-meta">学号:{{ user.studentNo || '-' }} · {{ user.major || '' }}</text>
+        <template v-if="userStore.isLoggedIn">
+          <text class="u-name">{{ user.name || '-' }}</text>
+          <text class="u-meta">学号:{{ user.studentNo || '-' }} · {{ user.major || '' }}</text>
+        </template>
+        <template v-else>
+          <text class="u-name" @click="goLogin">未登录</text>
+          <text class="u-meta" @click="goLogin">点击登录</text>
+        </template>
       </view>
-      <u-icon name="setting" color="#fff" size="20"></u-icon>
+      <u-icon name="setting" color="#fff" size="20" @click="goLogin"></u-icon>
     </view>
 
     <view class="stats-card">
@@ -29,7 +35,7 @@
       <u-cell icon="account" title="个人信息" isLink @click="todo"></u-cell>
       <u-cell icon="setting" title="账号设置" isLink @click="todo"></u-cell>
       <u-cell icon="info-circle" title="关于我们" isLink @click="todo"></u-cell>
-      <u-cell icon="reload" title="退出登录" isLink @click="logout"></u-cell>
+      <u-cell v-if="userStore.isLoggedIn" icon="reload" title="退出登录" isLink @click="logout"></u-cell>
     </u-cell-group>
 
     <TabBar :current="4"></TabBar>
@@ -53,10 +59,12 @@ onShow(async () => {
   if (userStore.isLoggedIn) {
     user.value = userStore.userInfo || {} as any
     try { stats.value = await getStudyStats() } catch (e) { /* stub => zeros */ }
-  } else {
-    redirectLogin()
   }
 })
+
+function goLogin() {
+  uni.navigateTo({ url: '/pages/login/login' }).catch(() => {})
+}
 
 function todo() { uni.showToast({ title: '即将上线', icon: 'none' }) }
 function logout() {

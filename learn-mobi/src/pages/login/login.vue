@@ -18,8 +18,7 @@
 
       <view class="field">
         <u-icon name="lock" color="#0195ff" size="20"></u-icon>
-        <u-input v-model="form.password" :type="showPwd ? 'text' : 'password'" placeholder="请输入密码" border="none"></u-input>
-        <u-icon :name="showPwd ? 'eye' : 'eye-off'" color="#bbb" size="20" @click="showPwd = !showPwd"></u-icon>
+        <u-input v-model="form.password" placeholder="请输入密码" border="none" :password="true"></u-input>
       </view>
 
       <view class="field">
@@ -50,7 +49,6 @@ import { useUserStore } from '../../stores/user'
 const userStore = useUserStore()
 const form = ref({ account: '', password: '', captchaCode: '' })
 const captcha = ref({ key: '', image: '' })
-const showPwd = ref(false)
 const loading = ref(false)
 
 onMounted(loadCaptcha)
@@ -106,9 +104,9 @@ async function doLogin() {
   display: flex; align-items: center; gap: 8px;
   border-bottom: 1px solid $border; padding: 10px 0;
 }
-.captcha-tap { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
-.captcha-img { width: 70px; height: 28px; border-radius: 6px; }
-.captcha-img.placeholder { background: $primary-bg; color: $primary; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+.captcha-tap { width: auto; height: auto; display: flex; align-items: center; }
+.captcha-img { width: 120px; height: 48px; border-radius: 8px; }
+.captcha-img.placeholder { width: 120px; height: 48px; background: $primary-bg; color: $primary; font-size: 13px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
 .links { display: flex; justify-content: space-between; font-size: 12px; color: $text-3; margin-top: 12px; }
 .link { color: $primary; }
 </style>
