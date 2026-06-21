@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
+import { onLaunch } from '@dcloudio/uni-app'
+import { useUserStore } from './stores/user'
+
+const userStore = useUserStore()
 
 onLaunch(() => {
-  console.log('App Launch')
-})
-
-onShow(() => {
-  console.log('App Show')
-})
-
-onHide(() => {
-  console.log('App Hide')
+  // 若本地有 token,尝试恢复用户信息(失败由 request 层 401 处理)
+  if (userStore.isLoggedIn) {
+    userStore.fetchUserInfo().catch(() => {})
+  }
 })
 </script>
 
-<style>
-/* 每个页面公共样式 */
+<style lang="scss">
+/* 全局引入 iconfont 字体包 */
+@import './static/font/iconfont.css';
+
+page {
+  background-color: #f5f7fa;
+  color: #222;
+  font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', Helvetica, sans-serif;
+}
 </style>
