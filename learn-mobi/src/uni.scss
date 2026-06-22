@@ -1,0 +1,35 @@
+/* ===== 主题变量 ===== */
+$primary: #0195ff;
+$primary-light: #00c6ff;
+$primary-bg: #e6f4ff;
+$accent: #ff7847;
+$accent-bg: #fff3ec;
+$danger: #f56c6c;
+$star: #ffb400;
+$text-1: #222222;
+$text-2: #666666;
+$text-3: #999999;
+$border: #eef2f7;
+$bg-page: #f5f7fa;
+$bg-card: #ffffff;
+$radius-card: 14px;
+$radius-btn: 21px;
+$shadow-card: 0 4px 16px rgba(0, 40, 80, 0.06);
+$gradient-primary: linear-gradient(135deg, #0195ff, #00c6ff);
+
+/* uni-app 内置变量(供 rpx 等) */
+$uni-color-primary: $primary;
+$uni-text-color: $text-1;
+$uni-text-color-grey: $text-3;
+$uni-bg-color: $bg-card;
+
+/* ===== uView Plus 主题覆盖 ===== */
+/* 必须先设置 $u-* 变量,再 @import 主题文件(theme.scss 里这些变量都带 !default,
+   先赋值才能覆盖;顺序反了不生效。theme.scss 注释明确要求经 uni.scss 引入)。 */
+$u-primary: $primary;
+$u-primary-light: $primary-bg;
+$u-primary-disabled: #a0d4ff;
+$u-primary-dark: #0074d6;
+$u-warning: $accent;
+$u-error: $danger;
+@import 'uview-plus/theme.scss';
