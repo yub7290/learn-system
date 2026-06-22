@@ -1,5 +1,5 @@
-export interface BannerItem { img: string; link: string }
-export interface NavItem { img: string; name: string; link: string }
+export interface BannerItem { id: number; imageUrl: string; linkUrl: string }
+export interface NavItem { name: string; link: string }
 export interface HomeBaseVO {
   logo: string
   banner: BannerItem[]
@@ -7,15 +7,14 @@ export interface HomeBaseVO {
 }
 export interface TeacherItem {
   id: number
-  avatar: string
+  avatarUrl: string
   name: string
-  star: number
+  titleName: string
 }
 export interface HomeCourseItem {
   id: number
-  img: string
+  imageUrl: string
   name: string
-  link: string
-  type: number
-  teacher?: string
+  courseType: number
+  teacherName: string
 }

@@ -5,10 +5,10 @@ export interface CategoryNode {
 }
 export interface CourseListItem {
   id: number
-  img: string
+  imageUrl: string
   name: string
-  type: number
-  teacher?: string
+  courseType: number
+  teacherName: string
 }
 export interface CourseDetailVO {
   course: {

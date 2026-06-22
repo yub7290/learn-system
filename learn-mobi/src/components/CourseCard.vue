@@ -1,13 +1,13 @@
 <template>
   <view class="course-card" @click="$emit('click', item)">
     <view class="cover" :style="{ background: coverBg }">
-      <image v-if="item.img" :src="item.img" mode="aspectFill" class="cover-img"></image>
+      <image v-if="item.imageUrl" :src="item.imageUrl" mode="aspectFill" class="cover-img"></image>
       <view class="tag" :class="tagClass">{{ tagText }}</view>
     </view>
     <view class="name">{{ item.name }}</view>
-    <view class="teacher" v-if="item.teacher">
+    <view class="teacher" v-if="item.teacherName">
       <u-icon name="account" color="#9aa4b2" size="12"></u-icon>
-      <text>{{ item.teacher }}</text>
+      <text>{{ item.teacherName }}</text>
     </view>
   </view>
 </template>
@@ -20,7 +20,7 @@ const props = defineProps<{ item: HomeCourseItem }>()
 defineEmits<{ (e: 'click', item: HomeCourseItem): void }>()
 
 const tagClass = computed(() => {
-  switch (props.item.type) {
+  switch (props.item.courseType) {
     case 1: return 'tag-ai'
     case 2: return 'tag-free'
     case 3: return 'tag-pay'
@@ -28,7 +28,7 @@ const tagClass = computed(() => {
   }
 })
 const tagText = computed(() => {
-  switch (props.item.type) {
+  switch (props.item.courseType) {
     case 1: return 'AI助教'
     case 2: return '免费'
     case 3: return '付费'
@@ -36,8 +36,8 @@ const tagText = computed(() => {
   }
 })
 const coverBg = computed(() => {
-  if (props.item.img) return '#fff'
-  return props.item.type === 3 ? 'linear-gradient(135deg,#ffb38a,#ff7847)' : 'linear-gradient(135deg,#7ec8ff,#0195ff)'
+  if (props.item.imageUrl) return '#fff'
+  return props.item.courseType === 3 ? 'linear-gradient(135deg,#ffb38a,#ff7847)' : 'linear-gradient(135deg,#7ec8ff,#0195ff)'
 })
 </script>
 

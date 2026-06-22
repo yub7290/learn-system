@@ -15,7 +15,8 @@
     { "path": "pages/mine/mine", "style": { "navigationBarTitleText": "我的", "navigationStyle": "custom" } },
     { "path": "pages/login/login", "style": { "navigationBarTitleText": "登录", "navigationStyle": "custom" } },
     { "path": "pages/course/detail", "style": { "navigationBarTitleText": "课程详情", "navigationStyle": "custom" } },
-    { "path": "pages/course/study", "style": { "navigationBarTitleText": "学习", "navigationStyle": "custom" } }
+    { "path": "pages/course/study", "style": { "navigationBarTitleText": "学习", "navigationStyle": "custom" } },
+    { "path": "pages/teacher/teacher", "style": { "navigationBarTitleText": "名师风采" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
