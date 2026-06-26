@@ -10,7 +10,7 @@
     <view class="course-grid" v-if="courseList.length">
       <CourseCard v-for="item in courseList" :key="item.id" :item="item" @click="goDetail" />
     </view>
-    <u-empty v-else text="暂无课程" mode="data" margin-top="60"></u-empty>
+    <u-empty v-else text="暂无课程" mode="data" margin-top="120"></u-empty>
 
     <u-loadmore v-if="courseList.length" :status="loadStatus" />
 
@@ -18,10 +18,32 @@
     <view class="drawer" :class="{ open: drawerShow }">
       <view class="drawer-title">课程分类</view>
       <scroll-view scroll-y class="drawer-scroll">
-        <view class="cate-item" v-for="c in categoryList" :key="c.id" :class="{ active: c.id === currentCateId }" @click="selectCate(c.id)">
+        <view
+          class="cate-item"
+          v-for="c in categoryList"
+          :key="c.id"
+          :class="{ active: c.id === currentCateId }"
+          @click="selectCate(c.id)"
+        >
           <text>{{ c.name }}</text>
         </view>
-        <u-empty v-if="!categoryList.length" text="暂无分类" mode="list" margin-top="30"></u-empty>
+        <view
+          class="cate-sub-item"
+          v-for="c in categoryList"
+          :key="'sub-' + c.id"
+          v-if="c.children && c.children.length"
+        >
+          <view
+            class="cate-child"
+            v-for="sub in c.children"
+            :key="sub.id"
+            :class="{ active: sub.id === currentCateId }"
+            @click="selectCate(sub.id)"
+          >
+            <text>{{ sub.name }}</text>
+          </view>
+        </view>
+        <u-empty v-if="!categoryList.length" text="暂无分类" mode="list" margin-top="60"></u-empty>
       </scroll-view>
     </view>
 
@@ -78,14 +100,17 @@ function goDetail(item: CourseListItem) { uni.navigateTo({ url: `/pages/course/d
 </script>
 
 <style scoped lang="scss">
-.course-page { min-height: 100vh; padding-bottom: 20px; }
-.topbar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: $bg-card; }
-.course-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 14px; }
+.course-page { min-height: 100vh; padding-bottom: 100rpx; }
+.topbar { display: flex; align-items: center; gap: 20rpx; padding: 24rpx 28rpx; background: $bg-card; }
+.course-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20rpx; padding: 24rpx 28rpx; }
 .mask { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99; }
 .drawer { position: fixed; left: 0; top: 0; bottom: 0; width: 72%; background: $bg-card; transform: translateX(-100%); transition: transform .25s; z-index: 100; padding-top: 44px; }
 .drawer.open { transform: translateX(0); }
-.drawer-title { font-size: 15px; font-weight: 700; padding: 12px 16px; color: $text-1; }
-.drawer-scroll { height: calc(100vh - 80px); }
-.cate-item { padding: 14px 16px; font-size: 14px; color: $text-2; border-bottom: 1px solid $border; }
+.drawer-title { font-size: 15px; font-weight: 700; padding: 12px 16px; color: $text-1; border-bottom: 1px solid $border; }
+.drawer-scroll { height: calc(100vh - 80px); padding: 8px 0; }
+.cate-item { padding: 14px 16px; font-size: 14px; color: $text-1; font-weight: 500; border-bottom: 1px solid $border; }
 .cate-item.active { color: $primary; background: $primary-bg; }
+.cate-sub-item { border-bottom: 1px solid $border; }
+.cate-child { padding: 10px 16px 10px 32px; font-size: 13px; color: $text-2; }
+.cate-child.active { color: $primary; background: $primary-bg; }
 </style>

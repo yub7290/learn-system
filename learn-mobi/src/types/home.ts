@@ -10,6 +10,7 @@ export interface TeacherItem {
   avatarUrl: string
   name: string
   titleName: string
+  rating: number
 }
 export interface HomeCourseItem {
   id: number
@@ -17,4 +18,5 @@ export interface HomeCourseItem {
   name: string
   courseType: number
   teacherName: string
+  feeType?: string
 }

@@ -9,6 +9,7 @@ export interface CourseListItem {
   name: string
   courseType: number
   teacherName: string
+  feeType?: string
 }
 export interface CourseDetailVO {
   course: {

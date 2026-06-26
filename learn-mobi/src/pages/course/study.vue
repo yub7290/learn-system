@@ -13,15 +13,15 @@
     </view>
 
     <view class="tab-bar">
-      <view class="tab-item" :class="{ active: bottomTab === 0 }" @click="bottomTab = 0">章节列表</view>
-      <view class="tab-item" :class="{ active: bottomTab === 1 }" @click="bottomTab = 1">交流</view>
-      <view class="tab-item" :class="{ active: bottomTab === 2 }" @click="bottomTab = 2">学习内容</view>
-      <view class="tab-item" :class="{ active: bottomTab === 3 }" @click="bottomTab = 3">附件</view>
-      <view class="tab-item" :class="{ active: bottomTab === 4 }" @click="goBack">返回课程</view>
+      <view class="tab-item" :class="{ active: bottomTab === 0 }" @click="handleTabClick(0)">章节列表</view>
+      <view class="tab-item" :class="{ active: bottomTab === 1 }" @click="handleTabClick(1)">交流</view>
+      <view class="tab-item" :class="{ active: bottomTab === 2 }" @click="handleTabClick(2)">学习内容</view>
+      <view class="tab-item" :class="{ active: bottomTab === 3 }" @click="handleTabClick(3)">附件</view>
+      <view class="tab-item" :class="{ active: bottomTab === 4 }" @click="handleTabClick(4)">返回课程</view>
     </view>
 
     <view class="content">
-      <view v-if="bottomTab === 0" class="empty-tab">章节列表请点右上角目录</view>
+      <view v-if="bottomTab === 0" class="empty-tab">点击底部"章节列表"按钮选择章节</view>
       <view v-if="bottomTab === 1" class="chat-region">
         <view v-if="mediaType === 'video'" class="chat-tip">录播视频暂不支持实时交流</view>
         <template v-else>
@@ -161,6 +161,12 @@ function switchChapter(ch: { id: number; chapterName: string }) {
   lastUploadTime = 0
   timer = null
   loadData()
+}
+
+function handleTabClick(idx: number) {
+  if (idx === 4) { goBack(); return }
+  if (idx === 0) { drawerShow.value = true; return }
+  bottomTab.value = idx
 }
 
 function goBack() { pauseTimer(); uni.navigateBack().catch(() => uni.reLaunch({ url: `/pages/course/detail?cid=${cid.value}` })) }
