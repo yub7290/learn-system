@@ -92,9 +92,34 @@ export interface ExamQuestionResultVO {
 
 /** 提交考试请求 */
 export interface ExamSubmitDTO {
-  examId: number
+  examId?: number
+  recordId?: number
   answers: ExamAnswerDTO[]
   duration: number
+}
+
+/** 课程结课考试信息 */
+export interface FinalExamVO {
+  examId: number
+  examName: string
+  duration: number
+  totalScore: number
+  passScore: number
+  maxAttempts: number
+  attemptedCount: number
+  highestScore: number
+  currentCompletionRate: number
+  chapterCompletionRate: number
+  canTake: boolean
+  cannotTakeReason?: string
+}
+
+/** 开考返回 */
+export interface StartExamVO {
+  recordId: number
+  questions: ExamQuestionVO[]
+  duration: number
+  endTime: string
 }
 
 /** 单题答案 */

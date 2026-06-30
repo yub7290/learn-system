@@ -68,6 +68,7 @@
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getCourseDetail } from '../../api/course'
+import { getCourseFinalExam } from '../../api/exam'
 import type { CourseDetailVO } from '../../types/course'
 
 const cid = ref(0)
@@ -122,7 +123,35 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
     }).catch(() => {})
     return
   }
+  if (f.name === '结课考试') {
+    handleFinalExam()
+    return
+  }
+  if (f.name === '课程公告') {
+    uni.navigateTo({ url: `/pages/course/announcement-list?cid=${cid.value}` }).catch(() => {})
+    return
+  }
+  if (f.name === '综合成绩') {
+    uni.navigateTo({ url: `/pages/course/comprehensive-score?courseId=${cid.value}` }).catch(() => {})
+    return
+  }
   uni.showToast({ title: `${f.name}功能即将上线`, icon: 'none' })
+}
+
+async function handleFinalExam() {
+  try {
+    uni.showLoading({ title: '加载中...', mask: true })
+    const data = await getCourseFinalExam(cid.value)
+    uni.hideLoading()
+    if (data && data.examId) {
+      uni.navigateTo({ url: `/pages/exam/exam-detail?courseId=${cid.value}&final=1` }).catch(() => {})
+    } else {
+      uni.showToast({ title: '暂无结课考试', icon: 'none' })
+    }
+  } catch {
+    uni.hideLoading()
+    uni.showToast({ title: '暂无结课考试', icon: 'none' })
+  }
 }
 </script>
 

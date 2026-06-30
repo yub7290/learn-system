@@ -5,6 +5,8 @@ import type {
   ExamQuestionVO,
   ExamResultVO,
   ExamSubmitDTO,
+  FinalExamVO,
+  StartExamVO,
   MonitorBehaviorVO,
   MonitorBehaviorDTO,
 } from '../types/exam'
@@ -55,6 +57,38 @@ export function submitExam(data: ExamSubmitDTO): Promise<ExamResultVO> {
  */
 export function clearExamHistory(examId: number): Promise<void> {
   return http.delete<void>('/student/exam/history/' + examId)
+}
+
+/**
+ * 查询课程结课考试
+ * @param courseId 课程ID
+ */
+export function getCourseFinalExam(courseId: number): Promise<FinalExamVO | null> {
+  return http.get<FinalExamVO | null>('/student/course/' + courseId + '/final-exam')
+}
+
+/**
+ * 开考
+ * @param examId 考试ID
+ */
+export function startExam(examId: number): Promise<StartExamVO> {
+  return http.post<StartExamVO>('/student/exam/' + examId + '/start')
+}
+
+/**
+ * 心跳
+ * @param recordId 考试记录ID
+ */
+export function heartbeat(recordId: number): Promise<void> {
+  return http.put<void>('/student/exam/record/' + recordId + '/heartbeat')
+}
+
+/**
+ * 查询考试结果
+ * @param recordId 考试记录ID
+ */
+export function getExamResult(recordId: number): Promise<ExamResultVO> {
+  return http.get<ExamResultVO>('/student/exam/record/' + recordId + '/result')
 }
 
 /** Mock 监考行为记录 */

@@ -165,7 +165,8 @@
 
         <!-- 底部按钮 -->
         <view class="result-action">
-          <view class="back-btn" @click="goToList">返回测试列表</view>
+          <view class="back-btn" @click="goToList">{{ isFinal ? '返回考试详情' : '返回测试列表' }}</view>
+          <view v-if="isFinal && result && !result.isPass" class="retry-btn" @click="goRetry">重新考试</view>
         </view>
       </scroll-view>
     </template>
@@ -175,7 +176,8 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { onLoad, onUnload } from '@dcloudio/uni-app'
-import { getExamDetail, getExamQuestions, submitExam } from '../../api/exam'
+import { getExamDetail, getExamQuestions, submitExam, heartbeat, getExamResult } from '../../api/exam'
+import { getExamStartData, clearExamStartData } from '../../utils/exam-cache'
 import type { ExamQuestionVO, ExamResultVO } from '../../types/exam'
 
 /* ---------- 题型映射 ---------- */
@@ -185,6 +187,9 @@ function typeColorBg(t: number) { return (typeColors[t] || '#999') + '18' }
 
 /* ---------- 状态 ---------- */
 const examId = ref(0)
+const recordId = ref(0)
+const courseId = ref(0)
+const isFinal = ref(false)
 const examTitle = ref('在线答题')
 const examDurationMin = ref(90)
 const questions = ref<ExamQuestionVO[]>([])
@@ -205,6 +210,7 @@ const isAutoAdvancing = ref(false)
 /* 计时器 */
 const remainSec = ref(0)
 let timerHandle: ReturnType<typeof setInterval> | null = null
+let heartbeatHandle: ReturnType<typeof setInterval> | null = null
 let autoAdvanceHandle: ReturnType<typeof setTimeout> | null = null
 
 function clearAutoAdvance() {
@@ -244,13 +250,23 @@ const safeUnansweredCount = computed(() =>
 
 /* ---------- 生命周期 ---------- */
 onLoad((q: any) => {
-  examId.value = Number(q.id) || 0
-  if (examId.value) loadData()
-  else loading.value = false
+  recordId.value = Number(q.recordId) || 0
+  examId.value = Number(q.id) || Number(q.examId) || 0
+  courseId.value = Number(q.courseId) || 0
+  isFinal.value = q.final === '1'
+
+  if (recordId.value) {
+    loadFromRecord()
+  } else if (examId.value) {
+    loadData()
+  } else {
+    loading.value = false
+  }
 })
 
 onUnload(() => {
   if (timerHandle) { clearInterval(timerHandle); timerHandle = null }
+  if (heartbeatHandle) { clearInterval(heartbeatHandle); heartbeatHandle = null }
   clearAutoAdvance()
 })
 
@@ -274,6 +290,60 @@ async function loadData() {
   } finally {
     loading.value = false
   }
+}
+
+/** 从启动缓存加载（结课考试） */
+async function loadFromRecord() {
+  try {
+    // 先检查缓存中是否有 startExam 返回的数据
+    const startData = getExamStartData()
+    if (startData && startData.recordId === recordId.value) {
+      examTitle.value = '结课考试'
+      questions.value = startData.questions
+      examDurationMin.value = startData.duration
+      clearExamStartData()
+      if (startData.questions.length > 0) {
+        startTimerFromEndTime(startData.endTime)
+        startHeartbeat(recordId.value)
+        nextTick(restoreQuestionState)
+      }
+    } else {
+      // 缓存不存在（如页面被重建），尝试加载结果
+      const resultData = await getExamResult(recordId.value)
+      if (resultData) {
+        result.value = resultData
+        submitted.value = true
+      } else {
+        uni.showToast({ title: '考试数据加载失败', icon: 'none' })
+      }
+    }
+  } catch {
+    uni.showToast({ title: '数据加载失败', icon: 'none' })
+  } finally {
+    loading.value = false
+  }
+}
+
+/** 基于 endTime 倒计时 */
+function startTimerFromEndTime(endTime: string) {
+  const end = new Date(endTime).getTime()
+  const now = Date.now()
+  remainSec.value = Math.max(0, Math.floor((end - now) / 1000))
+  timerHandle = setInterval(() => {
+    remainSec.value--
+    if (remainSec.value <= 0) {
+      if (timerHandle) { clearInterval(timerHandle); timerHandle = null }
+      uni.showToast({ title: '时间到，自动交卷', icon: 'none' })
+      doSubmit()
+    }
+  }, 1000)
+}
+
+/** 心跳 */
+function startHeartbeat(rid: number) {
+  heartbeatHandle = setInterval(() => {
+    heartbeat(rid).catch(() => {})
+  }, 30000)
 }
 
 /* ---------- 计时器 ---------- */
@@ -379,6 +449,7 @@ async function doSubmit() {
   clearAutoAdvance()
   saveCurrentAnswer()
   if (timerHandle) { clearInterval(timerHandle); timerHandle = null }
+  if (heartbeatHandle) { clearInterval(heartbeatHandle); heartbeatHandle = null }
   uni.showLoading({ title: '正在判分...', mask: true })
   try {
     const answerList = Object.entries(answers.value).map(([qId, ans]) => ({
@@ -386,11 +457,16 @@ async function doSubmit() {
       userAnswer: ans,
     }))
     const elapsed = examDurationMin.value * 60 - remainSec.value
-    result.value = await submitExam({
-      examId: examId.value,
+    const submitData: any = {
       answers: answerList,
       duration: Math.max(0, elapsed),
-    })
+    }
+    if (recordId.value) {
+      submitData.recordId = recordId.value
+    } else {
+      submitData.examId = examId.value
+    }
+    result.value = await submitExam(submitData)
     submitted.value = true
   } catch {
     uni.showToast({ title: '提交失败', icon: 'none' })
@@ -420,6 +496,7 @@ function goBack() {
       success: (res) => {
         if (res.confirm) {
           if (timerHandle) { clearInterval(timerHandle); timerHandle = null }
+          if (heartbeatHandle) { clearInterval(heartbeatHandle); heartbeatHandle = null }
           uni.navigateBack()
         }
       },
@@ -429,10 +506,24 @@ function goBack() {
   }
 }
 
-function goToList() {
-  uni.navigateBack({ delta: 2 }).catch(() => {
-    uni.reLaunch({ url: '/pages/exam/online-test' })
+function goRetry() {
+  // 返回考试详情页重新考试
+  uni.navigateBack({ delta: 1 }).catch(() => {
+    uni.reLaunch({ url: '/pages/index/index' })
   })
+}
+
+function goToList() {
+  if (isFinal.value) {
+    // 结课考试：返回详情页可重新考试
+    uni.navigateBack({ delta: 1 }).catch(() => {
+      uni.reLaunch({ url: '/pages/index/index' })
+    })
+  } else {
+    uni.navigateBack({ delta: 2 }).catch(() => {
+      uni.reLaunch({ url: '/pages/exam/online-test' })
+    })
+  }
 }
 </script>
 
@@ -538,6 +629,7 @@ function goToList() {
 .aq-analysis .aq-value { font-size: 13px; color: $text-2; line-height: 1.6; }
 
 /* ===== 结果页底部按钮 ===== */
-.result-action { padding: 20px 0 30px; }
+.result-action { padding: 20px 0 30px; display: flex; flex-direction: column; gap: 10px; }
 .back-btn { background: $gradient-primary; border-radius: 21px; padding: 12px 0; text-align: center; color: #fff; font-size: 15px; font-weight: 600; }
+.retry-btn { background: $accent; border-radius: 21px; padding: 12px 0; text-align: center; color: #fff; font-size: 15px; font-weight: 600; }
 </style>

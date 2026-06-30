@@ -3,7 +3,7 @@
     <!-- 顶部：Logo + 搜索栏 -->
     <view class="header-bar">
       <view class="header-left">
-        <text class="logo-text">学习系统</text>
+        <text class="logo-text">智慧教育</text>
       </view>
       <view class="search-wrap" @click="goSearch">
         <u-icon name="search" color="#bbb" size="16"></u-icon>
@@ -27,16 +27,6 @@
         </view>
         <text class="nav-name">{{ item.name }}</text>
       </view>
-    </view>
-
-    <!-- 快捷入口横幅：AI助教 -->
-    <view class="quick-entry" @click="goAI">
-      <text class="iconfont icon-robot qe-icon"></text>
-      <view class="qe-text">
-        <text class="qe-title">AI 助教</text>
-        <text class="qe-desc">智能问答 · 作业批改 · 随时辅导</text>
-      </view>
-      <u-icon name="arrow-right" color="#fff" size="14"></u-icon>
     </view>
 
     <!-- 优秀老师推荐 -->
@@ -70,26 +60,6 @@
       <u-empty v-else text="暂无推荐课程" mode="data" margin-top="16"></u-empty>
     </view>
 
-    <!-- 考试推荐 -->
-    <view class="section" v-if="examList.length">
-      <view class="sec-head">
-        <text class="sec-title">考试推荐</text>
-        <text class="sec-more" @click="goExamAll">全部 ›</text>
-      </view>
-      <scroll-view scroll-x class="exam-scroll">
-        <view class="exam-card" v-for="item in examList" :key="item.id" @click="goExam(item.id)">
-          <view class="exam-icon">
-            <text class="iconfont icon-shijuan"></text>
-          </view>
-          <view class="exam-info">
-            <text class="exam-title">{{ item.title }}</text>
-            <text class="exam-meta">{{ item.totalScore }}分 | {{ item.duration }}分钟</text>
-          </view>
-          <u-icon name="arrow-right" color="#ccc" size="12"></u-icon>
-        </view>
-      </scroll-view>
-    </view>
-
     <TabBar :current="0"></TabBar>
   </view>
 </template>
@@ -114,10 +84,8 @@ const examList = ref<ExamVO[]>([])
 const navData: NavItem[] = [
   { name: '全部课程', link: '/pages/course/course' },
   { name: '在线考试', link: '/pages/exam/exam' },
-  { name: 'AI 助教', link: '/pages/ai/chat' },
   { name: '名师风采', link: '/pages/teacher/teacher' },
   { name: '我的学习', link: '/pages/mine/mine' },
-  { name: '成长档案', link: '/pages/student-overview/index' },
 ]
 
 async function loadData() {
@@ -217,7 +185,7 @@ function getNavIcon(name: string): string {
   box-shadow: $shadow-card;
 }
 .nav-item {
-  flex: 0 0 33.33%;
+  flex: 0 0 25%;
   display: flex;
   flex-direction: column;
   align-items: center;

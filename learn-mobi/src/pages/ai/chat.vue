@@ -87,6 +87,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { chatSync } from '../../api/ai'
 import type { AiChatReqDTO } from '../../types/ai'
 
@@ -103,7 +104,15 @@ const inputText = ref('')
 const selectedImage = ref('')
 const isLoading = ref(false)
 const scrollToId = ref('')
+const currentCourseId = ref<number>(0)
 let msgIdCounter = 2
+
+// 从路由参数获取课程ID
+onLoad((options: any) => {
+  if (options?.courseId) {
+    currentCourseId.value = Number(options.courseId)
+  }
+})
 
 const messageList = ref<MessageItem[]>([
   { id: 1, role: 'ai', type: 'text', content: '你好，我是AI助教，有什么问题都可以问我哦~', time: getNow() },
@@ -156,16 +165,20 @@ async function sendTextMessage() {
   scrollBottom()
 
   try {
-    const res = await chatSync({ message: text } as AiChatReqDTO)
+    const res = await chatSync({ message: text, courseId: currentCourseId.value } as AiChatReqDTO)
     addMsg('ai', 'text', res.content)
     isLoading.value = false
     scrollBottom()
-  } catch (e) {
-    setTimeout(() => {
+  } catch (e: any) {
+    // 检查是否是每日限制错误
+    const errData = e?.data || e?.response?.data
+    if (errData?.code === 200304) {
+      addMsg('ai', 'text', '今日对话次数已达上限，请明天再试。')
+    } else {
       addMsg('ai', 'text', `关于「${text}」的回复：这是一个模拟回答，正式对接AI接口后将返回真实内容。`)
-      isLoading.value = false
-      scrollBottom()
-    }, 800)
+    }
+    isLoading.value = false
+    scrollBottom()
   }
 }
 

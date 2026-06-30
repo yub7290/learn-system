@@ -12,13 +12,13 @@
 
     <!-- 章节+知识点列表 -->
     <scroll-view scroll-y class="page-scroll" refresher-enabled @refresherrefresh="onRefresh" :refresher-triggered="refreshing">
-      <view v-if="chapterList.length === 0" class="empty-wrap">
+      <view v-if="groups.length === 0 && unassigned.length === 0" class="empty-wrap">
         <u-empty text="暂无知识点" mode="list" margin-top="60"></u-empty>
       </view>
 
-      <view class="chapter-list" v-else>
+      <view class="chapter-list" v-if="groups.length > 0">
         <!-- 单个章节卡片 -->
-        <view class="chapter-card" v-for="chapter in chapterList" :key="chapter.id">
+        <view class="chapter-card" v-for="chapter in groups" :key="chapter.id">
           <!-- 章节标题 -->
           <view class="chapter-header">
             <u-icon name="bookmark" color="#07c160" size="22"></u-icon>
@@ -34,13 +34,31 @@
               @click="goToDetail(item.id)"
             >
               <view class="item-left">
-                <text class="knowledge-title">{{ item.name }}</text>
-                <text class="knowledge-desc">{{ item.desc }}</text>
+                <text class="knowledge-title">{{ item.title }}</text>
+                <text class="knowledge-cate" v-if="item.categoryName">{{ item.categoryName }}</text>
               </view>
               <view class="item-right">
-                <text class="mastery-badge" v-if="item.masteryPercent !== undefined">{{ item.masteryPercent }}%</text>
                 <u-icon name="arrow-right" color="#ccc" size="14"></u-icon>
               </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 未分组知识点 -->
+      <view class="chapter-card" v-if="unassigned.length > 0">
+        <view class="chapter-header">
+          <u-icon name="list" color="#999" size="22"></u-icon>
+          <text class="chapter-title">未分类</text>
+        </view>
+        <view class="knowledge-list">
+          <view class="knowledge-item" v-for="item in unassigned" :key="'un-' + item.id" @click="goToDetail(item.id)">
+            <view class="item-left">
+              <text class="knowledge-title">{{ item.title }}</text>
+              <text class="knowledge-cate" v-if="item.categoryName">{{ item.categoryName }}</text>
+            </view>
+            <view class="item-right">
+              <u-icon name="arrow-right" color="#ccc" size="14"></u-icon>
             </view>
           </view>
         </view>
@@ -54,86 +72,48 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getChapterList } from '../../api/course'
-import { getKnowledgeList } from '../../api/knowledge'
-import type { ChapterListItem } from '../../types/course'
-import type { KnowledgeItemVO } from '../../types/knowledge'
+import { getCourseKnowledgeList } from '../../api/knowledge'
 
-/** 章节知识点组 */
-interface ChapterKnowledgeGroup {
+interface KnowledgeGroupItem {
   id: number
   name: string
-  knowledgeList: (KnowledgeItemVO & { desc?: string })[]
+  knowledgeList: { id: number; title: string; categoryName?: string }[]
 }
 
 const courseId = ref(0)
 const courseName = ref('')
-const chapterList = ref<ChapterKnowledgeGroup[]>([])
+const groups = ref<KnowledgeGroupItem[]>([])
+const unassigned = ref<{ id: number; title: string; categoryName?: string }[]>([])
 const refreshing = ref(false)
 
-/**
- * 加载章节与知识点数据
- */
 async function loadData() {
+  if (!courseId.value) return
   try {
-    // 并行获取章节列表和知识点列表
-    const [chRes, knList] = await Promise.all([
-      getChapterList(courseId.value).catch(() => ({ list: [] as ChapterListItem[] })),
-      getKnowledgeList({ courseId: courseId.value, page: 1, pageSize: 100 }).catch(() => ({ list: [] as KnowledgeItemVO[], total: 0 })),
-    ])
-
-    const chapters = chRes.list || []
-    const knowledgeItems = knList.list || []
-
-    if (chapters.length > 0) {
-      // 按章节分组：每个章节分配知识点
-      const itemsPerChapter = Math.ceil(knowledgeItems.length / Math.max(1, chapters.length))
-      chapterList.value = chapters.map((ch, idx) => {
-        const start = idx * itemsPerChapter
-        const items = knowledgeItems.slice(start, start + itemsPerChapter).map((k) => ({
-          ...k,
-          desc: `掌握度 ${k.masteryPercent}%  |  ${k.questionCount} 道相关题目`,
-        }))
-        return {
-          id: ch.id,
-          name: ch.chapterName,
-          knowledgeList: items,
-        }
-      })
-    } else {
-      // 无章节时，所有知识点归入"全部"
-      chapterList.value = knowledgeItems.length > 0
-        ? [{
-            id: 0,
-            name: '全部知识点',
-            knowledgeList: knowledgeItems.map((k) => ({
-              ...k,
-              desc: `掌握度 ${k.masteryPercent}%  |  ${k.questionCount} 道相关题目`,
-            })),
-          }]
-        : []
+    const res = await getCourseKnowledgeList(courseId.value)
+    if (res) {
+      groups.value = (res.groups || []).map(g => ({
+        id: g.chapterId,
+        name: g.chapterName,
+        knowledgeList: g.knowledgeList || [],
+      }))
+      unassigned.value = res.unassigned || []
+      if (!courseName.value && res.courseName) {
+        courseName.value = res.courseName
+      }
     }
-  } catch (e) {
+  } catch {
     uni.showToast({ title: '加载失败', icon: 'none' })
   }
 }
 
-/**
- * 下拉刷新
- */
 async function onRefresh() {
   refreshing.value = true
   await loadData()
   refreshing.value = false
 }
 
-/**
- * 跳转知识点详情
- */
 function goToDetail(id: number) {
-  uni.navigateTo({
-    url: `/pages/course/knowledge-detail?id=${id}&courseId=${courseId.value}&courseName=${encodeURIComponent(courseName.value)}`,
-  })
+  uni.navigateTo({ url: `/pages/course/knowledge-detail?id=${id}` })
 }
 
 function goBack() {
@@ -141,12 +121,8 @@ function goBack() {
 }
 
 onLoad((options: any) => {
-  if (options.courseId) {
-    courseId.value = Number(options.courseId)
-  }
-  if (options.courseName) {
-    courseName.value = decodeURIComponent(options.courseName)
-  }
+  if (options.courseId) courseId.value = Number(options.courseId)
+  if (options.courseName) courseName.value = decodeURIComponent(options.courseName)
   loadData()
 })
 </script>
@@ -280,7 +256,7 @@ page {
   line-height: 1.4;
 }
 
-.knowledge-desc {
+.knowledge-cate {
   font-size: 22rpx;
   color: $text-3;
   line-height: 1.5;
@@ -296,14 +272,6 @@ page {
   display: flex;
   align-items: center;
   gap: 12rpx;
-}
-
-.mastery-badge {
-  font-size: 22rpx;
-  color: $primary;
-  background: $primary-bg;
-  padding: 4rpx 12rpx;
-  border-radius: 20rpx;
 }
 
 .bottom-space {

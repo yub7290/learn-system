@@ -1,6 +1,5 @@
 import { http } from './request'
-import type { CategoryNode, CourseListItem, CourseDetailVO, ChapterDetailVO, ChapterListItem } from '../types/course'
-import type { KnowledgeItemVO, KnowledgeDetailVO, KnowledgeCategoryVO } from '../types/knowledge'
+import type { CategoryNode, CourseListItem, CourseDetailVO, ChapterDetailVO, ChapterListItem, CourseScoreVO } from '../types/course'
 
 /* ===== Mock Data ===== */
 
@@ -116,46 +115,7 @@ export function getChapterDetail(chId: number, cid: number): Promise<ChapterDeta
   })
 }
 
-/**
- * 获取课程知识库分类列表（Mock 实现）
- */
-export function getCourseKnowledgeCategoryList(cid: number): Promise<KnowledgeCategoryVO[]> {
-  return http.get<KnowledgeCategoryVO[]>('/student/course/knowledge/category', { cid }).catch(() =>
-    Promise.resolve([
-      { id: 1, name: '基础概念', children: [{ id: 11, name: '核心术语' }, { id: 12, name: '基础原理' }] },
-      { id: 2, name: '进阶技巧', children: [{ id: 21, name: '性能优化' }, { id: 22, name: '最佳实践' }] },
-      { id: 3, name: '常见问题' },
-    ])
-  )
-}
-
-/**
- * 获取课程知识点列表（Mock 实现）
- */
-export function getCourseKnowledgeList(cid: number): Promise<KnowledgeItemVO[]> {
-  return http.get<KnowledgeItemVO[]>('/student/course/knowledge/list', { cid }).catch(() =>
-    Promise.resolve([
-      { id: 101, name: 'Vue3 响应式原理', courseId: cid, courseName: 'Vue3 实战项目开发', masteryPercent: 60, questionCount: 12, difficulty: 3 },
-      { id: 102, name: 'Composition API 详解', courseId: cid, courseName: 'Vue3 实战项目开发', masteryPercent: 45, questionCount: 8, difficulty: 4 },
-      { id: 103, name: '组件通信方式', courseId: cid, courseName: 'Vue3 实战项目开发', masteryPercent: 80, questionCount: 15, difficulty: 2 },
-      { id: 104, name: 'Pinia 状态管理', courseId: cid, courseName: 'Vue3 实战项目开发', masteryPercent: 30, questionCount: 10, difficulty: 4 },
-    ])
-  )
-}
-
-/**
- * 获取课程知识点详情（Mock 实现）
- */
-export function getCourseKnowledgeDetail(cid: number, knowledgeId: number): Promise<KnowledgeDetailVO> {
-  return http.get<KnowledgeDetailVO>('/student/course/knowledge/detail', { cid, knowledgeId }).catch(() =>
-    Promise.resolve({
-      id: knowledgeId,
-      name: 'Vue3 响应式原理',
-      content: 'Vue3 使用 Proxy 替代 Vue2 的 Object.defineProperty 实现响应式，解决了无法侦测数组/对象新增属性的问题。核心包括 reactive、ref、computed 等 API。',
-      important: true,
-      questionIds: [1001, 1002, 1003],
-      videoUrl: 'https://media.w3.org/2010/05/sintel/trailer.mp4',
-      masteryPercent: 60,
-    })
-  )
+/** 获取课程综合成绩（不使用mock，直接请求后端） */
+export function getCourseScore(courseId: number): Promise<CourseScoreVO | null> {
+  return http.get<CourseScoreVO | null>(`/student/course/${courseId}/score`)
 }
