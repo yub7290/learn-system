@@ -8,6 +8,7 @@
     "dev:mp-weixin": "uni -p mp-weixin",
     "build:app": "uni build -p app",
     "build:h5": "uni build -p h5",
+    "postbuild:h5": "node -e \"const{execSync:e}=require('child_process');process.platform==='win32'?e('powershell Compress-Archive -Path dist/build/h5/* -DestinationPath dist.zip -Force',{stdio:'inherit'}):e('cd dist/build/h5 && zip -r ../../dist.zip .',{stdio:'inherit'})\"",
     "build:mp-weixin": "uni build -p mp-weixin",
     "test": "vitest run",
     "test:watch": "vitest"
