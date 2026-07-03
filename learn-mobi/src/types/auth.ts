@@ -19,6 +19,7 @@ export interface StudentInfoRespVO {
   id: number
   account: string
   name: string
+  nickName: string
   avatarUrl: string
   studentNo: string
   gender: number

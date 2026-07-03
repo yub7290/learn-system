@@ -1,8 +1,9 @@
 <template>
   <view class="study-page">
     <view class="player-box">
-      <video v-if="mediaType === 'video'" class="player" :src="mediaSrc" :initial-time="playProgress" @timeupdate="onTimeUpdate" @ended="onVideoEnd" @play="startTimer" @pause="pauseTimer" controls></video>
+      <video v-if="mediaType === 'video' && mediaSrc" :key="mediaSrc" class="player" :src="mediaSrc" :initial-time="playProgress" @timeupdate="onTimeUpdate" @ended="onVideoEnd" @play="startTimer" @pause="pauseTimer" controls></video>
       <live-player v-if="mediaType === 'live'" class="player" :src="mediaSrc" @play="startTimer" @pause="pauseTimer" autoplay></live-player>
+      <view v-if="mediaType === 'video' && !mediaSrc" class="player-empty">暂无视频</view>
       <view class="player-back" @click="goBack"><u-icon name="arrow-left" color="#fff" size="20"></u-icon></view>
       <view class="player-menu" @click="drawerShow = true"><u-icon name="list" color="#fff" size="20"></u-icon></view>
     </view>
@@ -12,12 +13,25 @@
       <text class="ch-progress">已学 {{ progressPercent }}%</text>
     </view>
 
+    <scroll-view v-if="mediaType === 'video' && videoList.length > 1" scroll-x class="video-scroll">
+      <view class="video-strip">
+        <view
+          class="video-chip"
+          v-for="(video, index) in videoList"
+          :key="video.videoUrl || index"
+          :class="{ active: index === currentVideoIndex }"
+          @click="switchVideo(index)"
+        >
+          {{ video.videoName || `视频${index + 1}` }}
+        </view>
+      </view>
+    </scroll-view>
+
     <view class="tab-bar">
       <view class="tab-item" :class="{ active: bottomTab === 0 }" @click="handleTabClick(0)">章节列表</view>
       <view class="tab-item" :class="{ active: bottomTab === 1 }" @click="handleTabClick(1)">交流</view>
       <view class="tab-item" :class="{ active: bottomTab === 2 }" @click="handleTabClick(2)">学习内容</view>
       <view class="tab-item" :class="{ active: bottomTab === 3 }" @click="handleTabClick(3)">附件</view>
-      <view class="tab-item" :class="{ active: bottomTab === 4 }" @click="handleTabClick(4)">返回课程</view>
     </view>
 
     <view class="content">
@@ -36,6 +50,11 @@
       </view>
       <view v-if="bottomTab === 2" class="article"><rich-text :nodes="articleContent"></rich-text></view>
       <view v-if="bottomTab === 3" class="attach-list">
+        <view class="attach-item video-attach" v-for="(video, index) in liveAttachmentVideos" :key="video.videoUrl || index">
+          <text class="a-name">{{ video.videoName || `视频${index + 1}` }}</text>
+          <text class="a-size" v-if="video.fileSize">{{ formatVideoSize(video.fileSize) }}</text>
+          <text class="a-size" v-else>视频</text>
+        </view>
         <view class="attach-item" v-for="f in attachList" :key="f.id">
           <text class="a-name">{{ f.fileName }}</text>
           <text class="a-size">{{ f.fileSize }}</text>
@@ -63,6 +82,7 @@ import { saveStudyRecord, batchUploadStudy } from '../../api/study'
 import { StorageKey } from '../../utils/storage'
 
 interface AttachItem { id: number; fileName: string; fileSize: string; fileUrl?: string }
+interface VideoItem { id?: number; videoName: string; videoUrl: string; fileSize?: number }
 interface ChatMsg { id: number; userName: string; content: string }
 
 const cid = ref(0)
@@ -70,6 +90,8 @@ const currentChapterId = ref(0)
 const currentChapterName = ref('')
 const mediaType = ref<'video' | 'live'>('video')
 const mediaSrc = ref('')
+const videoList = ref<VideoItem[]>([])
+const currentVideoIndex = ref(0)
 const articleContent = ref('')
 const attachList = ref<AttachItem[]>([])
 const chapterAllList = ref<Array<{ id: number; chapterName: string }>>([])
@@ -89,6 +111,7 @@ const progressPercent = computed(() => {
   if (!totalStudySecond.value) return 0
   return Math.min(100, Math.round((playSecond.value / Math.max(1, totalStudySecond.value)) * 100))
 })
+const liveAttachmentVideos = computed(() => mediaType.value === 'live' ? videoList.value : [])
 
 onLoad((q: any) => {
   cid.value = Number(q.cid) || 0
@@ -102,8 +125,10 @@ async function loadData() {
   // Load chapter detail
   try {
     const d = await getChapterDetail(currentChapterId.value, cid.value)
-    mediaType.value = d.mediaType
-    mediaSrc.value = d.mediaSrc
+    videoList.value = (d.videoList || []).filter((item: VideoItem) => !!item.videoUrl)
+    mediaType.value = d.mediaType === 'live' ? 'live' : 'video'
+    currentVideoIndex.value = 0
+    mediaSrc.value = mediaType.value === 'live' ? (d.mediaSrc || '') : (videoList.value[0]?.videoUrl || d.mediaSrc || '')
     articleContent.value = d.article || ''
     attachList.value = (d.attachList || []) as AttachItem[]
     const ch = chapterAllList.value.find((c) => c.id === currentChapterId.value)
@@ -157,10 +182,24 @@ function switchChapter(ch: { id: number; chapterName: string }) {
   pauseTimer()
   currentChapterId.value = ch.id
   currentChapterName.value = ch.chapterName
+  videoList.value = []
+  currentVideoIndex.value = 0
+  mediaSrc.value = ''
   playSecond.value = 0; totalStudySecond.value = 0; playProgress.value = 0
   lastUploadTime = 0
   timer = null
   loadData()
+}
+
+function switchVideo(index: number) {
+  const video = videoList.value[index]
+  if (!video || index === currentVideoIndex.value) return
+  pauseTimer()
+  currentVideoIndex.value = index
+  mediaSrc.value = video.videoUrl
+  playSecond.value = 0
+  playProgress.value = 0
+  lastUploadTime = 0
 }
 
 function handleTabClick(idx: number) {
@@ -177,17 +216,27 @@ function sendChat() {
   chatInput.value = ''
 }
 function downloadFile(f: AttachItem) { uni.showToast({ title: `下载 ${f.fileName}`, icon: 'none' }) }
+function formatVideoSize(size?: number) {
+  if (!size) return '视频'
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)}KB`
+  return `${(size / 1024 / 1024).toFixed(1)}MB`
+}
 </script>
 
 <style scoped lang="scss">
 .study-page { min-height: 100vh; background: $bg-card; display: flex; flex-direction: column; }
 .player-box { position: relative; height: 220px; background: #000; }
 .player { width: 100%; height: 100%; }
+.player-empty { height: 100%; display: flex; align-items: center; justify-content: center; color: #a8b0bd; font-size: 14px; }
 .player-back { position: absolute; top: 12px; left: 12px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
 .player-menu { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
 .ch-bar { display: flex; align-items: center; padding: 12px 14px; border-bottom: 1px solid $border; }
 .ch-title { font-size: 14px; font-weight: 600; color: $text-1; flex: 1; }
 .ch-progress { font-size: 11px; color: $text-3; }
+.video-scroll { white-space: nowrap; border-bottom: 1px solid $border; background: $bg-card; }
+.video-strip { display: inline-flex; gap: 8px; padding: 10px 14px; }
+.video-chip { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: $text-2; background: $bg-page; border: 1px solid $border; border-radius: 14px; padding: 5px 12px; }
+.video-chip.active { color: $primary; border-color: $primary; background: $primary-bg; font-weight: 600; }
 .tab-bar { display: flex; border-bottom: 1px solid $border; }
 .tab-item { flex: 1; text-align: center; padding: 10px 0; font-size: 12px; color: $text-3; }
 .tab-item.active { color: $primary; font-weight: 600; }

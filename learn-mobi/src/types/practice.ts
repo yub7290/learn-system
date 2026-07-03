@@ -6,6 +6,7 @@
 export interface PracticeOverviewVO {
   totalQuestionCount: number
   practicedCount: number
+  totalAttempts: number
   passRate: number
   chapterProgressList: ChapterPracticeProgressVO[]
 }
@@ -62,6 +63,7 @@ export interface PracticeQuestionSimpleVO {
   questionType: number
   content: string
   difficulty: number
+  courseId?: number
   wrongCount?: number
   chapterName?: string
   relatedTime?: string
@@ -112,4 +114,14 @@ export interface ReciteModeConfigVO {
   autoShowAnswer: boolean
   /** 是否自动播放解析 */
   autoPlayAnalysis: boolean
+}
+
+/** 单个课程的练习概览（含课程信息） */
+export interface CoursePracticeOverviewVO {
+  /** 课程ID */
+  courseId: number
+  /** 课程名称 */
+  courseName: string
+  /** 练习概览 */
+  overview: PracticeOverviewVO
 }

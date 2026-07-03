@@ -171,6 +171,7 @@ import { ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { getExamDetail, clearExamHistory, getCourseFinalExam, startExam } from '../../api/exam'
 import { setExamStartData } from '../../utils/exam-cache'
+import { requireLogin } from '../../utils/auth'
 import type { ExamDetailVO, ExamHistoryVO, FinalExamVO } from '../../types/exam'
 
 const examId = ref(0)
@@ -230,6 +231,7 @@ async function loadDetail() {
 }
 
 async function startFinalExam() {
+  if (!requireLogin('登录后才能参加考试')) return
   if (!finalInfo.value?.canTake || !examId.value) return
   try {
     uni.showLoading({ title: '正在准备考试...', mask: true })
@@ -244,10 +246,12 @@ async function startFinalExam() {
 }
 
 function startNormalExam() {
+  if (!requireLogin('登录后才能参加考试')) return
   uni.navigateTo({ url: `/pages/exam/exam-answer?id=${examId.value}` })
 }
 
 async function handleClearHistory() {
+  if (!requireLogin('登录后才能清空历史成绩')) return
   uni.showModal({
     title: '提示',
     content: '确定清空所有历史成绩？此操作不可恢复。',

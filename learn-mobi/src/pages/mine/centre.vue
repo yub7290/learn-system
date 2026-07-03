@@ -28,12 +28,12 @@
             <text class="menu-text">个人信息</text>
           </view>
           <view class="menu-right">
-            <text class="menu-desc">{{ userInfo.nickname || '未设置' }}</text>
+            <text class="menu-desc">{{ userInfo.nickname || '' }}</text>
             <u-icon name="arrow-right" color="#c0c4cc" size="14"></u-icon>
           </view>
         </view>
         <view class="menu-divider"></view>
-        <view class="menu-item" @click="goPage('contact')">
+        <view class="menu-item">
           <view class="menu-left">
             <view class="menu-icon-wrap icon-green">
               <u-icon name="phone" color="#07c160" size="18"></u-icon>
@@ -42,11 +42,11 @@
           </view>
           <view class="menu-right">
             <text class="menu-desc">{{ userInfo.phone || '未设置' }}</text>
-            <u-icon name="arrow-right" color="#c0c4cc" size="14"></u-icon>
+            <!-- <u-icon name="arrow-right" color="#c0c4cc" size="14"></u-icon> -->
           </view>
         </view>
         <view class="menu-divider"></view>
-        <view class="menu-item" @click="goPage('changePassword')">
+        <view class="menu-item" @click="showChangePassword = true">
           <view class="menu-left">
             <view class="menu-icon-wrap icon-orange">
               <u-icon name="lock" color="#ff7847" size="18"></u-icon>
@@ -83,12 +83,41 @@
 
       <view class="bottom-space"></view>
     </scroll-view>
+
+    <!-- 密码修改弹窗 -->
+    <u-popup :show="showChangePassword" mode="center" @close="showChangePassword = false" :round="16" :closeable="true">
+      <view class="popup-body">
+        <text class="popup-title">修改密码</text>
+
+        <view class="popup-field">
+          <text class="popup-label">原密码</text>
+          <input class="popup-input" v-model="pwdForm.oldPassword" type="password" placeholder="请输入原密码" maxlength="20" />
+        </view>
+        <view class="popup-field">
+          <text class="popup-label">新密码</text>
+          <input class="popup-input" v-model="pwdForm.newPassword" type="password" placeholder="请输入新密码（6-20位）" maxlength="20" />
+        </view>
+        <view class="popup-field">
+          <text class="popup-label">确认密码</text>
+          <input class="popup-input" v-model="pwdForm.confirmPassword" type="password" placeholder="再次输入新密码" maxlength="20" />
+        </view>
+
+        <text class="pwd-error" v-if="pwdError">{{ pwdError }}</text>
+
+        <u-button type="primary" shape="circle" :loading="pwdLoading" @click="handleChangePassword" class="popup-btn">确认修改</u-button>
+      </view>
+    </u-popup>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getPersonalInfo } from '../../api/mine'
+import { onShow } from '@dcloudio/uni-app'
+import { getPersonalInfo, shareRecord, shareRegister } from '../../api/mine'
+import { sm3Hash } from '../../utils/sm3'
+import { http } from '../../api/request'
+import { useUserStore } from '../../stores/user'
+import { BASE_URL } from '../../env'
 import type { PersonalInfoVO } from '../../types/mine'
 
 const userInfo = ref<PersonalInfoVO>({
@@ -101,17 +130,75 @@ const userInfo = ref<PersonalInfoVO>({
   gender: 0,
   birthday: '',
   schoolName: '',
-  gradeName: '',
 })
 
-onMounted(async () => {
+const userStore = useUserStore()
+
+async function loadUserInfo() {
   try {
     const info = await getPersonalInfo()
     userInfo.value = info
   } catch (e) {
-    /* stub - use defaults */
+    // 保持默认值
   }
+}
+
+onMounted(() => {
+  loadUserInfo()
 })
+
+onShow(() => {
+  loadUserInfo()
+})
+
+// 密码修改弹窗
+const showChangePassword = ref(false)
+const pwdLoading = ref(false)
+const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const pwdError = ref('')
+
+function checkPasswordStrength(pwd: string): { ok: boolean; msg: string } {
+  const hasUpper = /[A-Z]/.test(pwd)
+  const hasLower = /[a-z]/.test(pwd)
+  const hasDigit = /\d/.test(pwd)
+  const hasSymbol = /[^A-Za-z0-9]/.test(pwd)
+  const count = [hasUpper, hasLower, hasDigit, hasSymbol].filter(Boolean).length
+  if (count >= 3) return { ok: true, msg: '' }
+  const missing: string[] = []
+  if (!hasUpper) missing.push('大写字母')
+  if (!hasLower) missing.push('小写字母')
+  if (!hasDigit) missing.push('数字')
+  if (!hasSymbol) missing.push('符号')
+  return { ok: false, msg: `密码缺少${missing.join('、')}，至少包含三类` }
+}
+
+function handleChangePassword() {
+  pwdError.value = ''
+  const { oldPassword, newPassword, confirmPassword } = pwdForm.value
+
+  if (!oldPassword) { pwdError.value = '请输入原密码'; return }
+  if (!newPassword) { pwdError.value = '请输入新密码'; return }
+  if (newPassword.length < 6) { pwdError.value = '新密码不能少于6位'; return }
+  if (newPassword !== confirmPassword) { pwdError.value = '两次密码输入不一致'; return }
+
+  const strength = checkPasswordStrength(newPassword)
+  if (!strength.ok) { pwdError.value = strength.msg; return }
+
+  pwdLoading.value = true
+  http.post<void>('/app/profile/changePassword', {
+    oldPassword: sm3Hash(oldPassword),
+    newPassword: sm3Hash(newPassword),
+  }, undefined, { showError: false }).then(() => {
+    pwdError.value = ''
+    uni.showToast({ title: '密码修改成功', icon: 'success' })
+    showChangePassword.value = false
+    pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+  }).catch((err: any) => {
+    pwdError.value = err?.message || '修改失败'
+  }).finally(() => {
+    pwdLoading.value = false
+  })
+}
 
 function goBack() {
   uni.navigateBack()
@@ -120,7 +207,6 @@ function goBack() {
 function goPage(pageKey: string) {
   const pageMap: Record<string, string> = {
     personalInfo: '/pages/profile/personal-info',
-    contact: '/pages/profile/contact-info',
     changePassword: '/pages/profile/change-password',
     loginLog: '/pages/profile/login-log',
   }
@@ -132,17 +218,26 @@ function goPage(pageKey: string) {
   }
 }
 
-function handleShare() {
+async function handleShare() {
+  const userId = userStore.userInfo?.id
+  if (!userId) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return
+  }
+  const shareUrl = `${BASE_URL}/#/pages/register/register?inviter=${userId}`
   uni.showActionSheet({
     itemList: ['分享给好友', '分享到朋友圈', '复制链接'],
-    success: (res) => {
-      if (res.tapIndex === 0) {
-        uni.showToast({ title: '已分享给好友', icon: 'success' })
-      } else if (res.tapIndex === 1) {
-        uni.showToast({ title: '已分享到朋友圈', icon: 'success' })
+    success: async (res) => {
+      if (res.tapIndex === 0 || res.tapIndex === 1) {
+        try {
+          await shareRecord()
+          uni.showToast({ title: '分享成功,获得积分奖励', icon: 'success' })
+        } catch {
+          uni.showToast({ title: '已分享', icon: 'success' })
+        }
       } else {
         uni.setClipboardData({
-          data: 'https://www.example.com/share',
+          data: shareUrl,
           success: () => {
             uni.showToast({ title: '链接已复制', icon: 'success' })
           },
@@ -162,7 +257,7 @@ function handleShare() {
 .content-scroll {
   flex: 1;
   width: 100%;
-  padding-top: 12px;
+  padding-top: 64px;
   box-sizing: border-box;
 }
 
@@ -308,5 +403,46 @@ function handleShare() {
   display: flex;
   align-items: center;
   padding-left: 6px;
+}
+
+/* 密码修改弹窗 */
+.popup-body {
+  width: 300px;
+  padding: 24px 20px 30px;
+}
+.popup-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: $text-1;
+  text-align: center;
+  display: block;
+  margin-bottom: 20px;
+}
+.popup-field {
+  margin-bottom: 14px;
+}
+.popup-label {
+  font-size: 13px;
+  color: $text-2;
+  display: block;
+  margin-bottom: 6px;
+}
+.popup-input {
+  height: 44px;
+  background: $bg-page;
+  border-radius: 8px;
+  padding: 0 12px;
+  font-size: 14px;
+  color: $text-1;
+}
+.popup-btn {
+  margin-top: 8px;
+}
+.pwd-error {
+  color: #ef4444;
+  font-size: 12px;
+  display: block;
+  margin: 4px 0 0;
+  text-align: center;
 }
 </style>

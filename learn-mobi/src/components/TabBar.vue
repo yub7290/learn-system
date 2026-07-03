@@ -5,6 +5,8 @@
 </template>
 
 <script setup lang="ts">
+import { requireLogin } from '../utils/auth'
+
 defineProps<{ current: number }>()
 
 const tabs = [
@@ -17,6 +19,9 @@ const tabs = [
 
 function onChange(i: number) {
   const urls = ['/pages/index/index', '/pages/course/course', '/pages/student-overview/index', '/pages/exam/exam', '/pages/mine/mine']
+  if (i === 2 && !requireLogin('登录后才能查看成长档案')) return
+  if (i === 3 && !requireLogin('登录后才能查看你的在线考试')) return
+  if (i === 4 && !requireLogin('登录后才能查看我的学习')) return
   uni.reLaunch({ url: urls[i] }).catch(() => {})
 }
 </script>

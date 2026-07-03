@@ -165,6 +165,9 @@ export interface WeekReportVO {
   masteryOffset: number
   abilityList: AbilityScoreVO[]
   durationList: DurationItemVO[]
+  advantageSummary: string
+  weakSummary: string
+  studySuggestion: string
 }
 
 /** 知识图谱中题型节点 */
@@ -221,6 +224,7 @@ export interface GraphLineVO {
 /** 日常任务项 */
 export interface TaskItemVO {
   taskId: number
+  targetId?: number
   type: 'learn' | 'practice' | 'review' | 'summary' | 'preview'
   jumpType: 'course' | 'question' | 'paper' | 'result'
   title: string
@@ -245,12 +249,22 @@ export interface DailyPlanVO {
 
 /** 周计划详情 */
 export interface WeekPlanDetailVO {
+  planId: number
   weekName: string
   statusText: string
   weakPoints: string
   weekTotal: WeekStatsVO
   dailyPlanList: DailyPlanVO[]
   recommendCourses: RecommendCourseVO[]
+  advantageSummary: string
+  weakSummary: string
+  studySuggestion: string
+}
+
+/** 任务状态 */
+export interface TaskStatusVO {
+  taskId: number
+  completed: boolean
 }
 
 /** 推荐课程 */

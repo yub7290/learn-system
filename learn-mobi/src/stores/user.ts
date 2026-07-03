@@ -18,7 +18,7 @@ export const useUserStore = defineStore('user', {
   }),
   getters: {
     isLoggedIn: (s) => !!s.accessToken,
-    displayName: (s) => s.userInfo?.name || '同学',
+    displayName: (s) => s.userInfo?.nickName || s.userInfo?.name || '同学',
   },
   actions: {
     async login(req: StudentLoginReqDTO) {

@@ -14,6 +14,7 @@
     { "path": "pages/exam/exam", "style": { "navigationBarTitleText": "考试", "navigationStyle": "custom" } },
     { "path": "pages/mine/mine", "style": { "navigationBarTitleText": "我的", "navigationStyle": "custom" } },
     { "path": "pages/login/login", "style": { "navigationBarTitleText": "登录", "navigationStyle": "custom" } },
+    { "path": "pages/register/register", "style": { "navigationBarTitleText": "注册", "navigationStyle": "custom" } },
     { "path": "pages/course/detail", "style": { "navigationBarTitleText": "课程详情", "navigationStyle": "custom" } },
     { "path": "pages/course/study", "style": { "navigationBarTitleText": "学习", "navigationStyle": "custom" } },
     { "path": "pages/teacher/teacher", "style": { "navigationBarTitleText": "名师风采" } },
@@ -39,7 +40,10 @@
     { "path": "pages/student-overview/index", "style": { "navigationBarTitleText": "成长档案", "navigationStyle": "custom" } },
     { "path": "pages/student-overview/overview", "style": { "navigationBarTitleText": "成长总览", "navigationStyle": "custom" } },
     { "path": "pages/student-overview/weekly", "style": { "navigationBarTitleText": "周计划", "navigationStyle": "custom" } },
-    { "path": "pages/exam/monitor", "style": { "navigationBarTitleText": "在线监考", "navigationStyle": "custom" } }
+    { "path": "pages/exam/monitor", "style": { "navigationBarTitleText": "在线监考", "navigationStyle": "custom" } },
+    { "path": "pages/address/address-list", "style": { "navigationBarTitleText": "地址管理", "navigationStyle": "custom" } },
+    { "path": "pages/address/address-form", "style": { "navigationBarTitleText": "编辑地址", "navigationStyle": "custom" } },
+    { "path": "pages/mine/study-record", "style": { "navigationBarTitleText": "学习记录", "navigationStyle": "custom" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",

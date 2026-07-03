@@ -217,7 +217,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getWeekPlanDetail, getWeekPlanDetailList } from '../../api/student'
+import { getWeekPlanDetail, getWeekPlanDetailList, regenerateWeekPlan, updateWeeklyTaskStatus } from '../../api/student'
 import type { WeekPlanDetailVO, DailyPlanVO, TaskItemVO, RecommendCourseVO } from '../../types/student'
 
 const activeDayIndex = ref(0)
@@ -225,12 +225,16 @@ const currentWeekIndex = ref(0)
 const showWeekPicker = ref(false)
 
 const currentWeek = ref<WeekPlanDetailVO>({
+  planId: 0,
   weekName: '',
   statusText: '',
   weakPoints: '',
   weekTotal: { duration: 0, questions: 0, knowledge: 0 },
   dailyPlanList: [],
   recommendCourses: [],
+  advantageSummary: '',
+  weakSummary: '',
+  studySuggestion: '',
 })
 
 const weekPlanList = ref<{ weekName: string; statusText: string }[]>([])
@@ -263,58 +267,79 @@ const totalProgress = computed(() => {
 
 onShow(async () => {
   const [detail, list] = await Promise.all([
-    getWeekPlanDetail(0),
+    getWeekPlanDetail(currentWeekIndex.value),
     getWeekPlanDetailList(),
   ])
   currentWeek.value = detail
   weekPlanList.value = list
 })
 
+async function loadWeekPlan(): Promise<void> {
+  currentWeek.value = await getWeekPlanDetail(currentWeekIndex.value)
+}
+
 function toggleDay(index: number): void {
   activeDayIndex.value = activeDayIndex.value === index ? -1 : index
 }
 
-function regeneratePlan(): void {
-  uni.showToast({ title: '正在重新生成计划...', icon: 'loading', duration: 1500 })
+async function regeneratePlan(): Promise<void> {
+  uni.showLoading({ title: '正在重新生成' })
+  try {
+    currentWeek.value = await regenerateWeekPlan(currentWeekIndex.value)
+    weekPlanList.value = await getWeekPlanDetailList()
+    uni.showToast({ title: '计划已更新', icon: 'success' })
+  } finally {
+    uni.hideLoading()
+  }
 }
 
 function prevWeek(): void {
   if (currentWeekIndex.value >= weekPlanList.value.length - 1) return
   currentWeekIndex.value++
   resetViewState()
+  loadWeekPlan()
 }
 
 function nextWeek(): void {
   if (currentWeekIndex.value === 0) return
   currentWeekIndex.value--
   resetViewState()
+  loadWeekPlan()
 }
 
 function selectWeek(index: number): void {
   currentWeekIndex.value = index
   showWeekPicker.value = false
   resetViewState()
+  loadWeekPlan()
 }
 
 function resetViewState(): void {
   activeDayIndex.value = 0
 }
 
-function goToTaskPage(task: TaskItemVO): void {
+async function goToTaskPage(task: TaskItemVO): Promise<void> {
+  if (task.done) {
+    uni.showToast({ title: '任务已完成', icon: 'none' })
+    return
+  }
+  await updateWeeklyTaskStatus(task.taskId, true)
+  task.done = true
   let url = ''
+  const targetId = task.targetId || task.taskId
   const params = 'taskId=' + task.taskId + '&knowledge=' + encodeURIComponent(task.knowledge)
   switch (task.jumpType) {
     case 'course':
-      url = '/pages/course/detail?' + params
+      url = '/pages/course/detail?id=' + targetId + '&' + params
       break
     case 'question':
-      url = '/pages/practice/exercise?' + params
+      url = '/pages/practice/question?' + params
       break
     case 'paper':
-      url = '/pages/exam/online-test?' + params
+      url = '/pages/exam/online-test?examId=' + targetId + '&' + params
       break
     case 'result':
-      url = '/pages/course/knowledge-detail?' + params
+      url = '/pages/course/knowledge-detail?id=' + targetId + '&' + params
       break
   }
   if (url) uni.navigateTo({ url })

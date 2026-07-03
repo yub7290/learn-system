@@ -11,7 +11,7 @@
         />
         <view class="user-info" @click="goProfileCenter">
           <template v-if="userStore.isLoggedIn">
-            <text class="user-nickname">{{ user.name || '同学' }}</text>
+            <text class="user-nickname">{{ user.nickName || user.name || '同学' }}</text>
             <text class="user-desc">学号:{{ user.studentNo || '-' }}</text>
           </template>
           <template v-else>
@@ -197,7 +197,7 @@ import TabBar from '../../components/TabBar.vue'
 import { useUserStore } from '../../stores/user'
 import { getStudyStats } from '../../api/study'
 import { getPointsAccount } from '../../api/mine'
-import { redirectLogin } from '../../utils/auth'
+import { requireLogin } from '../../utils/auth'
 import type { StudyStatsVO } from '../../types/study'
 
 const userStore = useUserStore()
@@ -212,6 +212,12 @@ const cacheSize = ref('0M')
 
 onShow(async () => {
   if (userStore.isLoggedIn) {
+    // 刷新用户信息（从个人中心修改头像/昵称后同步）
+    try {
+      await userStore.fetchUserInfo()
+    } catch (e) {
+      /* 忽略 */
+    }
     user.value = userStore.userInfo || ({} as any)
     try {
       const s = await getStudyStats()
@@ -224,6 +230,14 @@ onShow(async () => {
       stats.value.points = pa.availablePoints || 0
     } catch (e) {
       /* stub */
+    }
+  } else {
+    user.value = {} as any
+    stats.value = {
+      courseCount: 0,
+      studyHours: 0,
+      certCount: 0,
+      points: 0,
     }
   }
   getCacheSize()
@@ -240,31 +254,22 @@ function getCacheSize() {
 }
 
 function goProfileCenter() {
-  if (!userStore.isLoggedIn) {
-    uni.navigateTo({ url: '/pages/login/login' }).catch(() => {})
-    return
-  }
+  if (!requireLogin('登录后才能查看个人资料')) return
   uni.navigateTo({ url: '/pages/mine/centre' })
 }
 
 function goSetting() {
-  if (!userStore.isLoggedIn) {
-    uni.navigateTo({ url: '/pages/login/login' }).catch(() => {})
-    return
-  }
+  if (!requireLogin('登录后才能进入账号设置')) return
   uni.navigateTo({ url: '/pages/mine/centre' })
 }
 
 function goPage(pageKey: string) {
-  if (!userStore.isLoggedIn) {
-    uni.navigateTo({ url: '/pages/login/login' }).catch(() => {})
-    return
-  }
+  if (!requireLogin('登录后才能使用该功能')) return
   const pageMap: Record<string, string> = {
     myCourse: '/pages/mine/my-course',
     studyCard: '/pages/mine/study-card',
     points: '/pages/mine/points-exchange',
-    studyRecord: '/pages/practice/index',
+    studyRecord: '/pages/mine/study-record',
     favorite: '/pages/practice/favorite',
     note: '/pages/practice/note',
   }
@@ -298,7 +303,14 @@ function handleLogout() {
     success: (res) => {
       if (res.confirm) {
         userStore.logout()
-        redirectLogin()
+        user.value = {} as any
+        stats.value = {
+          courseCount: 0,
+          studyHours: 0,
+          certCount: 0,
+          points: 0,
+        }
+        uni.showToast({ title: '已退出登录', icon: 'success' })
       }
     },
   })
@@ -340,6 +352,8 @@ function handleLogout() {
 
 .user-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .user-nickname {

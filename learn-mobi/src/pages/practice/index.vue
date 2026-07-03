@@ -121,8 +121,6 @@ interface QuickItem {
 
 const quickItems: QuickItem[] = [
   { key: 'wrong',    name: '错题回顾', icon: 'file-text',  bg: '#fff3ec', color: '#ff7847' },
-  { key: 'favorite', name: '我的收藏', icon: 'star',       bg: '#fff8e6', color: '#ffb400' },
-  { key: 'note',     name: '我的笔记', icon: 'edit-pen',   bg: '#e8f8f0', color: '#67c23a' },
   { key: 'highFreq', name: '高频错题', icon: 'grid',       bg: '#fef0f0', color: '#f56c6c' },
 ]
 

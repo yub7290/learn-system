@@ -12,5 +12,6 @@ export const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 export const PUBLIC_PATHS = [
   '/student/auth/login',
   '/student/auth/captcha',
+  '/student/auth/register',
   '/student/auth/refresh/',
 ]

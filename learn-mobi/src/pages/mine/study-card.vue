@@ -7,15 +7,15 @@
       </view>
     </u-navbar>
 
-    <scroll-view scroll-y class="content-scroll" show-scrollbar="false">
+    <scroll-view scroll-y class="content-scroll" show-scrollbar="false" @scrolltolower="loadMore" refresher-enabled @refresherrefresh="onRefresh">
       <!-- 用户信息卡片 -->
       <view class="user-info-card">
-        <image class="user-avatar" :src="'/static/default-avatar.png'" mode="aspectFill" />
+        <image class="user-avatar" :src="userStore.userInfo?.avatarUrl || 'https://img.yzcdn.cn/vant/cat.jpeg'" mode="aspectFill" />
         <view class="user-base">
-          <text class="user-nickname">{{ nickname }}</text>
+          <text class="user-nickname">{{ userStore.displayName }}</text>
           <view class="count-row">
             <view class="count-item">
-              <text class="count-num">{{ totalCardCount }}</text>
+              <text class="count-num">{{ totalCount }}</text>
               <text class="count-label">学习卡总数</text>
             </view>
             <view class="count-item">
@@ -68,7 +68,7 @@
             <text class="card-index">{{ index + 1 }}</text>
             <view class="card-main">
               <text class="card-no">{{ item.cardNo }}</text>
-              <text class="card-date">{{ item.startDate }} 至 {{ item.endDate }}</text>
+              <text class="card-date">{{ item.validStartDate || '未知' }} 至 {{ item.validEndDate || '未知' }}</text>
             </view>
             <view class="card-right">
               <u-tag
@@ -82,7 +82,7 @@
                 type="primary"
                 plain
                 :hairline="true"
-                @click="fillCardInput(item.cardNo)"
+                @click="handleQuickUse(item.cardNo)"
               >立即使用</u-button>
             </view>
           </view>
@@ -97,35 +97,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import type { StudyCardVO } from '@/types/mine'
+import { getMyStudyCards, useStudyCard, saveStudyCard, getStudyCardSummary } from '@/api/mine'
+import { useUserStore } from '@/stores/user'
 
-interface CardItem {
-  id: number
-  cardNo: string
-  startDate: string
-  endDate: string
-  status: number
-}
+const userStore = useUserStore()
 
 const statusTextMap: string[] = ['未使用', '已使用', '已回滚']
 const statusTypeMap: string[] = ['primary', 'success', 'info']
 const filterOptions: string[] = ['全部', '未使用', '已使用', '已回滚']
 
-const nickname = ref('同学')
 const cardInput = ref('')
-const scrollTop = ref(0)
 const currentFilter = ref(0)
+const loading = ref(false)
+const loadingMore = ref(false)
 
-const cardList = ref<CardItem[]>([
-  { id: 1, cardNo: 'STUDY20240001', startDate: '2024-01-01', endDate: '2024-12-31', status: 0 },
-  { id: 2, cardNo: 'STUDY20240002', startDate: '2024-03-01', endDate: '2025-02-28', status: 1 },
-  { id: 3, cardNo: 'STUDY20240003', startDate: '2023-06-01', endDate: '2024-05-31', status: 2 },
-  { id: 4, cardNo: 'STUDY20240004', startDate: '2024-06-01', endDate: '2025-05-31', status: 0 },
-])
+/** 汇总数据 */
+const totalCount = ref(0)
+const usedCount = ref(0)
 
-const totalCardCount = computed(() => cardList.value.length)
-
-const usedCount = computed(() => cardList.value.filter((item) => item.status === 1).length)
+/** 分页数据 */
+const cardList = ref<StudyCardVO[]>([])
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+const hasMore = computed(() => cardList.value.length < total.value)
 
 const currentFilterText = computed(() => filterOptions[currentFilter.value])
 
@@ -135,8 +132,61 @@ const filteredList = computed(() => {
     const status = currentFilter.value - 1
     list = list.filter((item) => item.status === status)
   }
-  list.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
   return list
+})
+
+/** 加载汇总信息 */
+async function loadSummary() {
+  try {
+    const summary = await getStudyCardSummary()
+    totalCount.value = summary.totalCount
+    usedCount.value = summary.usedCount
+  } catch {
+    // 忽略
+  }
+}
+
+/** 加载学习卡列表（首页） */
+async function loadData() {
+  if (loading.value) return
+  loading.value = true
+  page.value = 1
+  try {
+    const result = await getMyStudyCards({ page: page.value, pageSize: pageSize.value })
+    cardList.value = result.list
+    total.value = result.total
+  } catch {
+    uni.showToast({ title: '加载失败，请重试', icon: 'none' })
+  } finally {
+    loading.value = false
+  }
+}
+
+/** 加载更多（触底加载） */
+async function loadMore() {
+  if (loadingMore.value || !hasMore.value) return
+  loadingMore.value = true
+  try {
+    page.value++
+    const result = await getMyStudyCards({ page: page.value, pageSize: pageSize.value })
+    cardList.value.push(...result.list)
+    total.value = result.total
+  } catch {
+    page.value--
+  } finally {
+    loadingMore.value = false
+  }
+}
+
+/** 下拉刷新 */
+async function onRefresh() {
+  await loadSummary()
+  await loadData()
+}
+
+onMounted(() => {
+  loadSummary()
+  loadData()
 })
 
 function goBack() {
@@ -165,49 +215,56 @@ function handleScan() {
   })
 }
 
-function handleSave() {
-  const inputNo = cardInput.value.trim()
-  if (!inputNo) {
+/** 从输入中提取纯卡号（去除可能附带的密钥部分，如 "BD816FAW - 973472" → "BD816FAW"） */
+function extractCardNo(input: string): string {
+  const trimmed = input.trim()
+  const dashIndex = trimmed.indexOf(' - ')
+  return dashIndex > 0 ? trimmed.substring(0, dashIndex) : trimmed
+}
+
+/** 暂存学习卡 */
+async function handleSave() {
+  const cardNo = extractCardNo(cardInput.value)
+  if (!cardNo) {
     uni.showToast({ title: '请输入学习卡号', icon: 'none' })
     return
   }
-  const isExist = cardList.value.some((item) => item.cardNo === inputNo)
+  const isExist = cardList.value.some((item) => item.cardNo === cardNo)
   if (isExist) {
     uni.showToast({ title: '学习卡已寄存', icon: 'none' })
     return
   }
   uni.showLoading({ title: '提交中...' })
-  setTimeout(() => {
-    uni.hideLoading()
-    const newCard: CardItem = {
-      id: Date.now(),
-      cardNo: inputNo,
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: '2026-12-31',
-      status: 0,
-    }
-    cardList.value.unshift(newCard)
+  try {
+    await saveStudyCard(cardNo)
     cardInput.value = ''
     uni.showToast({ title: '已存入我的学习卡中', icon: 'success' })
-  }, 800)
+    await Promise.all([loadSummary(), loadData()])
+  } catch {
+    // 错误已由 request 拦截器处理
+  } finally {
+    uni.hideLoading()
+  }
 }
 
-function handleUse() {
-  const inputNo = cardInput.value.trim()
-  if (!inputNo) {
+/** 使用学习卡 */
+async function handleUse() {
+  const cardNo = extractCardNo(cardInput.value)
+  if (!cardNo) {
     uni.showToast({ title: '请输入学习卡号', icon: 'none' })
     return
   }
   uni.showLoading({ title: '使用中...' })
-  setTimeout(() => {
-    uni.hideLoading()
-    const target = cardList.value.find((item) => item.cardNo === inputNo)
-    if (target) {
-      target.status = 1
-    }
+  try {
+    await useStudyCard(cardNo)
     cardInput.value = ''
     uni.showToast({ title: '已使用', icon: 'success' })
-  }, 800)
+    await Promise.all([loadSummary(), loadData()])
+  } catch {
+    // 错误已由 request 拦截器处理
+  } finally {
+    uni.hideLoading()
+  }
 }
 
 function showFilterSheet() {
@@ -219,10 +276,25 @@ function showFilterSheet() {
   })
 }
 
-function fillCardInput(cardNo: string) {
-  cardInput.value = cardNo
-  scrollTop.value = 0
-  uni.showToast({ title: '卡号已填入，可点击使用', icon: 'none', duration: 1500 })
+/** 快捷使用：直接调用后台接口 */
+async function handleQuickUse(cardNo: string) {
+  uni.showModal({
+    title: '确认使用',
+    content: `确定使用学习卡 ${cardNo} 吗？`,
+    success: async (res) => {
+      if (!res.confirm) return
+      uni.showLoading({ title: '使用中...' })
+      try {
+        await useStudyCard(cardNo)
+        uni.showToast({ title: '已使用', icon: 'success' })
+        await Promise.all([loadSummary(), loadData()])
+      } catch {
+        // 错误已由 request 拦截器处理
+      } finally {
+        uni.hideLoading()
+      }
+    },
+  })
 }
 </script>
 
@@ -234,7 +306,7 @@ function fillCardInput(cardNo: string) {
 
 .content-scroll {
   width: 100%;
-  padding: 12px 14px;
+  padding: 64px 14px;
   box-sizing: border-box;
 }
 

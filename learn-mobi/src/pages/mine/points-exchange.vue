@@ -12,64 +12,88 @@
     </u-navbar>
 
     <scroll-view scroll-y class="page-scroll" show-scrollbar="false">
+      <!-- 积分余额卡片 -->
+      <view class="points-card">
+        <view class="points-card-bg"></view>
+        <view class="points-card-circle"></view>
+        <view class="points-card-content">
+          <text class="points-card-label">当前可用积分</text>
+          <view class="points-card-row">
+            <text class="points-card-num">{{ userPoints }}</text>
+            <text class="points-card-unit">分</text>
+          </view>
+          <text class="points-card-hint">兑换商品即扣除相应积分</text>
+        </view>
+      </view>
+
       <!-- 学习卡兑换 -->
       <view class="section">
         <view class="section-title">学习卡兑换</view>
-        <view class="goods-grid">
+        <view class="goods-grid" v-if="cardList.length > 0">
           <view
             v-for="item in cardList"
             :key="item.id"
             class="goods-card"
+            @click="openExchangePanel(item)"
           >
-            <image class="goods-image" :src="item.imageUrl" mode="aspectFill" />
+            <image class="goods-image" :src="item.imageUrl || '/static/default-goods.png'" mode="aspectFill" />
             <view class="goods-info">
               <text class="goods-name">{{ item.name }}</text>
               <view class="goods-bottom">
                 <text class="goods-points">{{ item.requiredPoints }} 积分</text>
-                <u-button
-                  size="mini"
-                  type="success"
-                  :disabled="userPoints < item.requiredPoints"
-                  :hairline="true"
-                  @click="openExchangePanel(item)"
-                >兑换</u-button>
+                <view
+                  v-if="userPoints >= item.requiredPoints"
+                  class="exchange-btn"
+                  @click.stop="openExchangePanel(item)"
+                ><text class="exchange-btn-text">兑换</text></view>
+                <view v-else class="insufficient-tag">
+                  <text class="insufficient-text">积分不足</text>
+                </view>
               </view>
             </view>
           </view>
+        </view>
+        <view class="empty-state" v-else>
+          <u-empty mode="list" text="暂无学习卡商品" :marginTop="20"></u-empty>
         </view>
       </view>
 
       <!-- 实物兑换 -->
       <view class="section">
         <view class="section-title">实物兑换</view>
-        <view class="goods-grid">
+        <view class="goods-grid" v-if="goodsList.length > 0">
           <view
             v-for="item in goodsList"
             :key="item.id"
             class="goods-card"
+            @click="openExchangePanel(item)"
           >
-            <image class="goods-image" :src="item.imageUrl" mode="aspectFill" />
+            <image class="goods-image" :src="item.imageUrl || '/static/default-goods.png'" mode="aspectFill" />
             <view class="goods-info">
               <text class="goods-name">{{ item.name }}</text>
               <view class="goods-bottom">
                 <text class="goods-points">{{ item.requiredPoints }} 积分</text>
-                <u-button
-                  size="mini"
-                  type="success"
-                  :disabled="userPoints < item.requiredPoints"
-                  :hairline="true"
-                  @click="openExchangePanel(item)"
-                >兑换</u-button>
+                <view
+                  v-if="userPoints >= item.requiredPoints"
+                  class="exchange-btn"
+                  @click.stop="openExchangePanel(item)"
+                ><text class="exchange-btn-text">兑换</text></view>
+                <view v-else class="insufficient-tag">
+                  <text class="insufficient-text">积分不足</text>
+                </view>
               </view>
             </view>
           </view>
+        </view>
+        <view class="empty-state" v-else>
+          <u-empty mode="list" text="暂无实物商品" :marginTop="20"></u-empty>
         </view>
       </view>
 
       <view class="bottom-space"></view>
     </scroll-view>
 
-    <!-- 兑换弹窗 -->
+    <!-- 兑换确认弹窗 -->
     <u-popup :show="showExchangePanel" mode="bottom" round="16" @close="closeExchangePanel">
       <view class="exchange-panel">
         <view class="panel-header">
@@ -78,47 +102,81 @@
         </view>
 
         <view class="goods-row">
-          <image class="row-image" :src="currentGoods.imageUrl" mode="aspectFill" />
+          <image class="row-image" :src="currentGoods.imageUrl || '/static/default-goods.png'" mode="aspectFill" />
           <view class="row-info">
             <text class="row-name">{{ currentGoods.name }}</text>
             <text class="row-points">消耗 {{ currentGoods.requiredPoints }} 积分</text>
           </view>
         </view>
 
-        <view class="way-select" v-if="currentGoods.type === 'goods'">
+        <!-- 实物商品: 兑换方式选择 -->
+        <view class="way-select" v-if="currentGoods.productType === 1">
           <text class="way-label">兑换方式</text>
           <view class="way-btns">
-            <u-button
-              :type="exchangeWay === 'offline' ? 'success' : 'default'"
-              shape="square"
-              size="medium"
-              :plain="exchangeWay !== 'offline'"
+            <view
+              class="way-btn"
+              :class="{ 'way-btn-active': exchangeWay === 'offline' }"
               @click="exchangeWay = 'offline'"
-            >线下兑换</u-button>
-            <u-button
-              :type="exchangeWay === 'mail' ? 'success' : 'default'"
-              shape="square"
-              size="medium"
-              :plain="exchangeWay !== 'mail'"
+            >
+              <u-icon name="map-fill" :color="exchangeWay === 'offline' ? '#fff' : '#999'" size="18"></u-icon>
+              <text class="way-btn-text" :class="{ 'way-btn-text-active': exchangeWay === 'offline' }">线下兑换</text>
+            </view>
+            <view
+              class="way-btn"
+              :class="{ 'way-btn-active': exchangeWay === 'mail' }"
               @click="exchangeWay = 'mail'"
-            >邮寄到家</u-button>
+            >
+              <u-icon name="car-fill" :color="exchangeWay === 'mail' ? '#fff' : '#999'" size="18"></u-icon>
+              <text class="way-btn-text" :class="{ 'way-btn-text-active': exchangeWay === 'mail' }">邮寄到家</text>
+            </view>
           </view>
         </view>
 
-        <view class="address-form" v-if="currentGoods.type === 'goods' && exchangeWay === 'mail'">
-          <u--input v-model="addressInfo.name" placeholder="请输入收货人姓名" border="none" customStyle="background:#f5f7fa;border-radius:8px;padding:0 12px;height:42px;margin-bottom:12px"></u--input>
-          <u--input v-model="addressInfo.phone" placeholder="请输入联系电话" type="number" border="none" customStyle="background:#f5f7fa;border-radius:8px;padding:0 12px;height:42px;margin-bottom:12px"></u--input>
-          <u--textarea v-model="addressInfo.address" placeholder="请输入详细收货地址" border="none" customStyle="background:#f5f7fa;border-radius:8px;padding:12px;margin-bottom:12px"></u--textarea>
+        <!-- 邮寄: 选择收货地址 -->
+        <view class="address-select" v-if="currentGoods.productType === 1 && exchangeWay === 'mail'">
+          <view class="address-header">
+            <text class="way-label">收货地址</text>
+            <view class="manage-link" @click="goAddressManage">
+              <u-icon name="setting" color="#0195ff" size="14"></u-icon>
+              <text class="manage-text">管理地址</text>
+            </view>
+          </view>
+          <view class="address-list" v-if="addressList.length > 0">
+            <view
+              v-for="addr in addressList"
+              :key="addr.id"
+              class="address-item"
+              :class="{ 'address-active': selectedAddressId === addr.id }"
+              @click="selectedAddressId = addr.id"
+            >
+              <view class="addr-main">
+                <text class="addr-name">{{ addr.name }}</text>
+                <text class="addr-phone">{{ addr.phone }}</text>
+              </view>
+              <text class="addr-detail">{{ addr.province }}{{ addr.city }}{{ addr.district }} {{ addr.detail }}</text>
+              <view class="addr-default" v-if="addr.isDefault === 1">
+                <text class="default-tag">默认</text>
+              </view>
+            </view>
+          </view>
+          <view class="address-empty" v-else @click="goAddressForm">
+            <u-icon name="plus-circle" color="#0195ff" size="20"></u-icon>
+            <text class="address-empty-text">暂无地址，去添加</text>
+          </view>
         </view>
 
-        <view class="offline-tip" v-if="currentGoods.type === 'goods' && exchangeWay === 'offline'">
+        <!-- 线下兑换提示 -->
+        <view class="offline-tip" v-if="currentGoods.productType === 1 && exchangeWay === 'offline'">
           <u-icon name="info-circle" color="#d48806" size="16"></u-icon>
           <text class="tip-text">兑换成功后将生成兑换码，可凭码到线下校区领取实物</text>
         </view>
 
-        <u-button type="success" shape="circle" size="large" @click="submitExchange">
-          确认兑换
-        </u-button>
+        <view class="confirm-btn-wrap" @click="submitExchange">
+          <view class="confirm-btn" :class="{ 'confirm-btn-disabled': exchangeLoading }">
+            <u-loading-icon v-if="exchangeLoading" color="#fff" size="18"></u-loading-icon>
+            <text class="confirm-btn-text">{{ exchangeLoading ? '兑换中...' : '确认兑换' }}</text>
+          </view>
+        </view>
       </view>
     </u-popup>
 
@@ -127,109 +185,134 @@
       <view class="result-panel">
         <u-icon name="checkmark-circle" color="#07c160" size="50"></u-icon>
         <text class="result-title">兑换成功</text>
-        <text class="result-desc" v-if="resultType === 'code'">请保存好您的兑换码</text>
+
+        <text class="result-desc" v-if="exchangeResult.cardNo">请保存好您的学习卡信息</text>
+        <text class="result-desc" v-else-if="exchangeResult.exchangeCode">请保存好您的兑换码，凭码到线下校区领取</text>
         <text class="result-desc" v-else>订单已提交，我们将尽快为您发货</text>
 
-        <view class="code-box" v-if="resultType === 'code'" @click="copyCode">
-          <text class="code-value">{{ resultCode }}</text>
-          <u-button size="mini" type="success" :hairline="true" style="margin-top:10px">复制</u-button>
-        </view>
-
-        <view class="order-box" v-else>
-          <view class="order-row">
-            <text class="order-label">订单编号</text>
-            <text class="order-value">{{ resultOrderNo }}</text>
+        <!-- 学习卡 -->
+        <view class="info-box" v-if="exchangeResult.cardNo">
+          <view class="info-row">
+            <text class="info-label">卡号</text>
+            <text class="info-value">{{ exchangeResult.cardNo }}</text>
           </view>
-          <view class="order-row">
-            <text class="order-label">收货地址</text>
-            <text class="order-value">{{ addressInfo.name }} {{ addressInfo.phone }} {{ addressInfo.address }}</text>
+          <view class="info-row" v-if="exchangeResult.cardSecret">
+            <text class="info-label">密钥</text>
+            <text class="info-value">{{ exchangeResult.cardSecret }}</text>
           </view>
         </view>
 
-        <u-button type="success" shape="circle" size="large" style="margin-top:16px" @click="closeResultPanel">
-          我知道了
-        </u-button>
+        <!-- 线下兑换码 -->
+        <view v-if="exchangeResult.exchangeCode" style="width:100%">
+          <view class="code-value" @click="copyText(exchangeResult.exchangeCode)">{{ exchangeResult.exchangeCode }}</view>
+          <view class="copy-btn" @click.stop="copyText(exchangeResult.exchangeCode)">
+            <text class="copy-btn-text">复制兑换码</text>
+          </view>
+        </view>
+
+        <!-- 邮寄订单号 -->
+        <view class="info-box" v-if="!exchangeResult.cardNo && !exchangeResult.exchangeCode && exchangeResult.orderNo">
+          <view class="info-row">
+            <text class="info-label">订单编号</text>
+            <text class="info-value">{{ exchangeResult.orderNo }}</text>
+          </view>
+        </view>
+
+        <view class="ok-btn" @click="closeResultPanel">
+          <text class="ok-btn-text">我知道了</text>
+        </view>
       </view>
     </u-popup>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { getPointsAccount, getPointsProductList, exchangePointsProduct } from '../../api/mine'
-import type { PointsProductVO } from '../../types/mine'
+import { getAddressList } from '../../api/address'
+import type { PointsProductVO, AddressVO, ExchangeResultVO } from '../../types/mine'
 
-interface GoodsItem extends PointsProductVO {
-  type: 'card' | 'goods'
-}
+const userPoints = ref(0)
 
-interface AddressInfo {
-  name: string
-  phone: string
-  address: string
-}
-
-const userPoints = ref(5800)
-
-const cardList = ref<GoodsItem[]>([])
-const goodsList = ref<GoodsItem[]>([])
+const cardList = ref<PointsProductVO[]>([])
+const goodsList = ref<PointsProductVO[]>([])
 
 const showExchangePanel = ref(false)
 const showResultPanel = ref(false)
-const currentGoods = ref<GoodsItem>({
+const exchangeLoading = ref(false)
+const currentGoods = ref<PointsProductVO>({
   id: 0,
-  type: 'card',
   name: '',
+  productType: 1,
   imageUrl: '',
   requiredPoints: 0,
   stockCount: 0,
 })
 
 const exchangeWay = ref<'offline' | 'mail'>('offline')
-const addressInfo = reactive<AddressInfo>({ name: '', phone: '', address: '' })
-const resultType = ref<'code' | 'order'>('code')
-const resultCode = ref('')
-const resultOrderNo = ref('')
+const addressList = ref<AddressVO[]>([])
+const selectedAddressId = ref<number>(0)
+const exchangeResult = ref<ExchangeResultVO>({})
 
+/** 加载积分和商品数据 */
 async function loadData() {
   try {
     const pa = await getPointsAccount()
     userPoints.value = pa.availablePoints || 0
-  } catch (e) {
-    /* stub */
+  } catch {
+    /* 保持 0 */
   }
 
   try {
-    const res = await getPointsProductList({ page: 1, pageSize: 20 })
+    const res = await getPointsProductList({ page: 1, pageSize: 50 })
     if (res.list.length > 0) {
-      cardList.value = res.list.slice(0, 2).map((p) => ({ ...p, type: 'card' as const }))
-      goodsList.value = res.list.slice(2).map((p) => ({ ...p, type: 'goods' as const }))
-      return
+      cardList.value = res.list.filter((p) => p.productType === 2)
+      goodsList.value = res.list.filter((p) => p.productType === 1)
     }
-  } catch (e) {
-    /* use mock */
+  } catch {
+    /* 保持空列表 */
   }
-
-  cardList.value = [
-    { id: 1, type: 'card', name: '语文进阶学习月卡', imageUrl: 'https://picsum.photos/id/24/200/200', requiredPoints: 1000, stockCount: 99 },
-    { id: 2, type: 'card', name: '全科知识点季卡', imageUrl: 'https://picsum.photos/id/42/200/200', requiredPoints: 2500, stockCount: 50 },
-  ]
-  goodsList.value = [
-    { id: 3, type: 'goods', name: '定制笔记本套装', imageUrl: 'https://picsum.photos/id/20/200/200', requiredPoints: 800, stockCount: 30 },
-    { id: 4, type: 'goods', name: '古诗词必背手册', imageUrl: 'https://picsum.photos/id/28/200/200', requiredPoints: 1200, stockCount: 20 },
-  ]
 }
 
-loadData()
+/** 加载收货地址列表 */
+async function loadAddressList() {
+  try {
+    const list = await getAddressList()
+    addressList.value = list || []
+    // 默认选中默认地址
+    const defaultAddr = addressList.value.find((a) => a.isDefault === 1)
+    if (defaultAddr) {
+      selectedAddressId.value = defaultAddr.id
+    } else if (addressList.value.length > 0) {
+      selectedAddressId.value = addressList.value[0].id
+    }
+  } catch {
+    addressList.value = []
+  }
+}
 
-function openExchangePanel(item: GoodsItem) {
+onShow(() => {
+  loadData()
+  // 如果之前已经打开过地址列表则刷新
+  if (showExchangePanel.value && currentGoods.value.productType === 1 && exchangeWay.value === 'mail') {
+    loadAddressList()
+  }
+})
+
+function openExchangePanel(item: PointsProductVO) {
   if (userPoints.value < item.requiredPoints) {
     uni.showToast({ title: '积分不足', icon: 'none' })
     return
   }
   currentGoods.value = item
   exchangeWay.value = 'offline'
+  selectedAddressId.value = 0
   showExchangePanel.value = true
+  // 实物商品需要加载地址列表
+  if (item.productType === 1) {
+    loadAddressList()
+  }
 }
 
 function closeExchangePanel() {
@@ -242,60 +325,42 @@ function submitExchange() {
     return
   }
 
-  if (currentGoods.value.type === 'goods' && exchangeWay.value === 'mail') {
-    if (!addressInfo.name.trim()) {
-      uni.showToast({ title: '请输入收货人姓名', icon: 'none' })
-      return
-    }
-    if (!addressInfo.phone.trim() || addressInfo.phone.length < 11) {
-      uni.showToast({ title: '请输入正确的联系电话', icon: 'none' })
-      return
-    }
-    if (!addressInfo.address.trim()) {
-      uni.showToast({ title: '请输入详细地址', icon: 'none' })
+  // 邮寄方式需要校验收货地址
+  if (currentGoods.value.productType === 1 && exchangeWay.value === 'mail') {
+    if (!selectedAddressId.value) {
+      uni.showToast({ title: '请选择收货地址', icon: 'none' })
       return
     }
   }
 
   uni.showLoading({ title: '兑换中...' })
+  exchangeLoading.value = true
 
-  exchangePointsProduct(currentGoods.value.id)
-    .then(() => {
+  const exchangeType = currentGoods.value.productType === 2 ? 1 : (exchangeWay.value === 'mail' ? 2 : 1)
+  const addressId = (currentGoods.value.productType === 1 && exchangeWay.value === 'mail')
+    ? selectedAddressId.value
+    : undefined
+
+  exchangePointsProduct(currentGoods.value.id, exchangeType, addressId)
+    .then((result) => {
       userPoints.value -= currentGoods.value.requiredPoints
-      if (currentGoods.value.type === 'card' || exchangeWay.value === 'offline') {
-        resultType.value = 'code'
-        resultCode.value = generateExchangeCode()
-      } else {
-        resultType.value = 'order'
-        resultOrderNo.value = 'ORD' + Date.now()
-      }
+      exchangeResult.value = result || {}
       showExchangePanel.value = false
       showResultPanel.value = true
     })
     .catch(() => {
-      userPoints.value -= currentGoods.value.requiredPoints
-      resultType.value = 'code'
-      resultCode.value = generateExchangeCode()
-      showExchangePanel.value = false
-      showResultPanel.value = true
+      uni.showToast({ title: '兑换失败，请稍后重试', icon: 'none' })
     })
     .finally(() => {
       uni.hideLoading()
+      exchangeLoading.value = false
     })
 }
 
-function generateExchangeCode(): string {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-  let code = ''
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return code
-}
-
-function copyCode() {
+function copyText(text: string) {
+  if (!text) return
   uni.setClipboardData({
-    data: resultCode.value,
+    data: text,
     success: () => {
       uni.showToast({ title: '复制成功', icon: 'success' })
     },
@@ -310,12 +375,23 @@ function showRecords() {
   uni.showToast({ title: '积分记录', icon: 'none' })
 }
 
+function goAddressManage() {
+  showExchangePanel.value = false
+  uni.navigateTo({ url: '/pages/address/address-list' })
+}
+
+function goAddressForm() {
+  showExchangePanel.value = false
+  uni.navigateTo({ url: '/pages/address/address-form' })
+}
+
 function goBack() {
   uni.navigateBack()
 }
 </script>
 
 <style scoped lang="scss">
+/* ── Page Layout ───────────────────────────────────── */
 .page {
   min-height: 100vh;
   background: $bg-page;
@@ -323,80 +399,35 @@ function goBack() {
 
 .page-scroll {
   width: 100%;
-  padding: 12px 14px;
+  padding: 64px 14px;
   box-sizing: border-box;
 }
 
 .section {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .section-title {
+  position: relative;
   font-size: 16px;
   font-weight: 600;
   color: $text-1;
   margin-bottom: 12px;
-  padding-left: 4px;
+  padding-left: 12px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 3px;
+    bottom: 3px;
+    width: 3px;
+    border-radius: 2px;
+    background: $primary;
+  }
 }
 
-.goods-grid {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.goods-card {
-  width: calc((100% - 12px) / 2);
-  background: $bg-card;
-  border-radius: $radius-card;
-  overflow: hidden;
-  box-shadow: $shadow-card;
-  box-sizing: border-box;
-}
-
-.goods-image {
-  width: 100%;
-  height: 120px;
-  display: block;
-  background: $bg-page;
-}
-
-.goods-info {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.goods-name {
-  font-size: 13px;
-  color: $text-1;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.goods-bottom {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.goods-points {
-  font-size: 14px;
-  color: $accent;
-  font-weight: 600;
-}
-
-.bottom-space {
-  height: 20px;
-}
-
+/* ── Points Badge (Navbar) ─────────────────────────── */
 .points-badge {
   display: flex;
   flex-direction: row;
@@ -420,9 +451,171 @@ function goBack() {
   opacity: 0.9;
 }
 
+.nav-left {
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+}
+
+/* ── Points Card ───────────────────────────────────── */
+.points-card {
+  position: relative;
+  margin-bottom: 24px;
+  border-radius: $radius-card;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(1, 149, 255, 0.3);
+}
+
+.points-card-bg {
+  position: absolute;
+  inset: 0;
+  background: $gradient-primary;
+}
+
+.points-card-circle {
+  position: absolute;
+  top: -30px;
+  right: -20px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.points-card-content {
+  position: relative;
+  padding: 28px 22px 24px;
+  z-index: 1;
+}
+
+.points-card-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: 1px;
+}
+
+.points-card-row {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.points-card-num {
+  font-size: 40px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -1px;
+}
+
+.points-card-unit {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-left: 2px;
+}
+
+.points-card-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 6px;
+}
+
+/* ── Goods Grid ────────────────────────────────────── */
+.goods-grid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.goods-card {
+  width: calc((100% - 12px) / 2);
+  background: $bg-card;
+  border-radius: $radius-card;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 40, 80, 0.06);
+  box-sizing: border-box;
+  transition: transform 0.15s;
+
+  &:active {
+    transform: scale(0.98);
+  }
+}
+
+.goods-image {
+  width: 100%;
+  height: 140px;
+  display: block;
+  background: linear-gradient(135deg, #f0f4f8, #e8ecf1);
+}
+
+.goods-info {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.goods-name {
+  font-size: 14px;
+  color: $text-1;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.goods-bottom {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.goods-points {
+  font-size: 15px;
+  color: $accent;
+  font-weight: 700;
+}
+
+.exchange-btn {
+  padding: 4px 14px;
+  background: $gradient-primary;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(1, 149, 255, 0.25);
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.exchange-btn-text {
+  font-size: 12px;
+  color: #fff;
+  font-weight: 500;
+}
+
+.insufficient-tag {
+  padding: 2px 8px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.insufficient-text {
+  font-size: 11px;
+  color: $text-3;
+}
+
+/* ── Exchange Panel (Bottom Sheet) ─────────────────── */
 .exchange-panel {
-  padding: 20px 16px;
-  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  padding: 24px 20px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
 }
 
 .panel-header {
@@ -430,12 +623,12 @@ function goBack() {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .panel-title {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   color: $text-1;
 }
 
@@ -443,19 +636,19 @@ function goBack() {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 14px;
+  padding: 14px;
   background: $bg-page;
-  border-radius: 12px;
-  margin-bottom: 16px;
+  border-radius: 14px;
+  margin-bottom: 20px;
 }
 
 .row-image {
-  width: 60px;
-  height: 60px;
-  border-radius: 8px;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
   flex-shrink: 0;
-  background: #eee;
+  background: linear-gradient(135deg, #f0f4f8, #e8ecf1);
 }
 
 .row-info {
@@ -476,6 +669,7 @@ function goBack() {
   color: $accent;
 }
 
+/* ── Exchange Way Selection ─────────────────────────── */
 .way-select {
   margin-bottom: 16px;
 }
@@ -494,6 +688,137 @@ function goBack() {
   gap: 12px;
 }
 
+.way-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  border-radius: 10px;
+  background: $bg-page;
+  border: 2px solid $border;
+}
+
+.way-btn-active {
+  background: $gradient-primary;
+  border-color: $primary;
+}
+
+.way-btn-text {
+  font-size: 14px;
+  color: $text-2;
+  font-weight: 500;
+}
+
+.way-btn-text-active {
+  color: #fff;
+}
+
+/* ── Address Selection ─────────────────────────────── */
+.address-select {
+  margin-bottom: 16px;
+}
+
+.address-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+
+  .way-label {
+    margin-bottom: 0;
+  }
+}
+
+.manage-link {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.manage-text {
+  font-size: 13px;
+  color: $primary;
+}
+
+.address-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.address-item {
+  padding: 12px;
+  background: $bg-page;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  position: relative;
+
+  &.address-active {
+    border-color: $primary;
+  }
+}
+
+.addr-main {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.addr-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: $text-1;
+}
+
+.addr-phone {
+  font-size: 14px;
+  color: $text-2;
+}
+
+.addr-detail {
+  font-size: 12px;
+  color: $text-3;
+  line-height: 1.5;
+}
+
+.addr-default {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.default-tag {
+  font-size: 11px;
+  color: $primary;
+  background: $primary-bg;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.address-empty {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  background: $bg-page;
+  border-radius: 8px;
+  border: 1px dashed $border;
+}
+
+.address-empty-text {
+  font-size: 13px;
+  color: $primary;
+}
+
+/* ── Offline Tip ───────────────────────────────────── */
 .offline-tip {
   display: flex;
   flex-direction: row;
@@ -512,79 +837,148 @@ function goBack() {
   line-height: 1.6;
 }
 
+/* ── Confirm Button ────────────────────────────────── */
+.confirm-btn-wrap {
+  margin-top: 4px;
+  width: 100%;
+}
+
+.confirm-btn {
+  height: 48px;
+  background: $gradient-primary;
+  border-radius: 24px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.confirm-btn-disabled {
+  opacity: 0.6;
+}
+
+.confirm-btn-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* ── Result Panel (Center Popup) ───────────────────── */
 .result-panel {
-  width: 300px;
-  padding: 32px 24px;
+  width: 320px;
+  padding: 24px 24px 28px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
+  text-align: center;
 }
 
 .result-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   color: $text-1;
-  margin: 12px 0 6px;
+  margin: 14px 0 8px;
+  text-align: center;
 }
 
 .result-desc {
   font-size: 13px;
   color: $text-2;
   margin-bottom: 16px;
+  text-align: center;
 }
 
-.code-box {
-  width: 100%;
+.info-box {
   padding: 16px;
   background: $bg-page;
-  border-radius: 12px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+
+.info-row {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.info-label {
+  font-size: 13px;
+  color: $text-2;
+}
+
+.info-value {
+  font-size: 14px;
+  color: $text-1;
+  font-weight: 500;
 }
 
 .code-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: $text-1;
-  letter-spacing: 2px;
-}
-
-.order-box {
   width: 100%;
-  padding: 16px;
-  background: $bg-page;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: $primary;
+  letter-spacing: 4px;
+  padding: 12px 0;
+  background: rgba(1, 149, 255, 0.06);
+  border-radius: 10px;
+  margin-bottom: 12px;
 }
 
-.order-row {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.order-label {
-  font-size: 12px;
-  color: $text-2;
-  flex-shrink: 0;
-}
-
-.order-value {
-  flex: 1;
-  font-size: 12px;
-  color: $text-1;
-  line-height: 1.5;
-  word-break: break-all;
-}
-
-.nav-left {
+.copy-btn {
+  width: 100%;
+  height: 44px;
+  background: $gradient-primary;
+  border-radius: 22px;
   display: flex;
   align-items: center;
-  padding-left: 6px;
+  justify-content: center;
+  margin-bottom: 16px;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.copy-btn-text {
+  font-size: 15px;
+  color: #fff;
+  font-weight: 500;
+}
+
+.ok-btn {
+  width: 100%;
+  height: 44px;
+  background: $gradient-primary;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.ok-btn-text {
+  font-size: 16px;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── Utilities ─────────────────────────────────────── */
+.bottom-space {
+  height: 20px;
+}
+
+.empty-state {
+  padding: 10px 0;
+  text-align: center;
 }
 </style>

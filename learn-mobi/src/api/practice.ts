@@ -8,7 +8,8 @@ import type {
   FavoriteToggleVO,
   PracticeSessionVO,
   AnswerSheetItemVO,
-  ReciteModeConfigVO
+  ReciteModeConfigVO,
+  CoursePracticeOverviewVO
 } from '../types/practice'
 
 /** 获取练习概览 */
@@ -94,6 +95,16 @@ export function deleteNote(noteId: number): Promise<void> {
   return http.delete<void>('/student/practice/notes/' + noteId)
 }
 
+/** 更新笔记 */
+export function updateNote(noteId: number, noteContent: string): Promise<void> {
+  return http.put<void>('/student/practice/notes/' + noteId, { noteContent })
+}
+
+/** 查询用户在某题目下的笔记 */
+export function getNoteForQuestion(questionId: number): Promise<NoteVO[]> {
+  return http.get<NoteVO[]>('/student/practice/notes/question/' + questionId)
+}
+
 /** 高频错题 */
 export function getHighFreqWrong(courseId: number): Promise<PracticeQuestionSimpleVO[]> {
   return http.get<PracticeQuestionSimpleVO[]>('/student/practice/high-freq-wrong', { courseId })
@@ -133,4 +144,9 @@ export function getReciteModeConfig(): Promise<ReciteModeConfigVO> {
  */
 export function toggleReciteAutoShowAnswer(autoShowAnswer: boolean): Promise<ReciteModeConfigVO> {
   return Promise.resolve({ autoShowAnswer, autoPlayAnalysis: false })
+}
+
+/** 获取所有课程的练习概览 */
+export function getAllCoursesPracticeOverview(): Promise<CoursePracticeOverviewVO[]> {
+  return http.get<CoursePracticeOverviewVO[]>('/student/practice/all-courses-overview')
 }

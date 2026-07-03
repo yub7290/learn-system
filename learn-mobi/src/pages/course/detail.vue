@@ -69,6 +69,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getCourseDetail } from '../../api/course'
 import { getCourseFinalExam } from '../../api/exam'
+import { requireLogin } from '../../utils/auth'
 import type { CourseDetailVO } from '../../types/course'
 
 const cid = ref(0)
@@ -98,6 +99,7 @@ function goBack() { uni.navigateBack().catch(() => uni.reLaunch({ url: '/pages/c
 
 /** 开始学习：跳转到第一章 */
 function startLearning() {
+  if (!requireLogin('登录后才能开始学习并保存学习进度')) return
   if (info.value.chapter && info.value.chapter.length > 0) {
     openStudy(info.value.chapter[0].id)
   } else {
@@ -105,9 +107,16 @@ function startLearning() {
   }
 }
 
-function openStudy(chId: number) { uni.navigateTo({ url: `/pages/course/study?cid=${cid.value}&chId=${chId}` }).catch(() => {}) }
+function openStudy(chId: number) {
+  if (!requireLogin('登录后才能开始学习并保存学习进度')) return
+  uni.navigateTo({ url: `/pages/course/study?cid=${cid.value}&chId=${chId}` }).catch(() => {})
+}
 function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
-  if (f.name === 'AI助教') { uni.navigateTo({ url: `/pages/ai/chat?courseId=${cid.value}` }).catch(() => {}); return }
+  if (f.name === 'AI助教') {
+    if (!requireLogin('登录后才能使用 AI 助教')) return
+    uni.navigateTo({ url: `/pages/ai/chat?courseId=${cid.value}` }).catch(() => {})
+    return
+  }
   if (f.name === '视频/直播') {
     // 跳转到学习页的第一个章节
     if (info.value.chapter && info.value.chapter.length > 0) {
@@ -115,8 +124,16 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
     } else { uni.showToast({ title: '暂无视频内容', icon: 'none' }) }
     return
   }
-  if (f.name === '试题练习') { uni.navigateTo({ url: `/pages/practice/index?courseId=${cid.value}` }).catch(() => {}); return }
-  if (f.name === '在线测试') { uni.navigateTo({ url: `/pages/exam/online-test?courseId=${cid.value}` }).catch(() => {}); return }
+  if (f.name === '试题练习') {
+    if (!requireLogin('登录后才能进行试题练习')) return
+    uni.navigateTo({ url: `/pages/practice/index?courseId=${cid.value}` }).catch(() => {})
+    return
+  }
+  if (f.name === '在线测试') {
+    if (!requireLogin('登录后才能参加在线测试')) return
+    uni.navigateTo({ url: `/pages/exam/online-test?courseId=${cid.value}` }).catch(() => {})
+    return
+  }
   if (f.name === '知识库') {
     uni.navigateTo({
       url: `/pages/course/knowledge-list?courseId=${cid.value}&courseName=${encodeURIComponent(info.value.course.title)}`,
@@ -124,6 +141,7 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
     return
   }
   if (f.name === '结课考试') {
+    if (!requireLogin('登录后才能参加结课考试')) return
     handleFinalExam()
     return
   }
@@ -132,6 +150,7 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
     return
   }
   if (f.name === '综合成绩') {
+    if (!requireLogin('登录后才能查看综合成绩')) return
     uni.navigateTo({ url: `/pages/course/comprehensive-score?courseId=${cid.value}` }).catch(() => {})
     return
   }

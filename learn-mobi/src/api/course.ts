@@ -1,5 +1,6 @@
 import { http } from './request'
 import type { CategoryNode, CourseListItem, CourseDetailVO, ChapterDetailVO, ChapterListItem, CourseScoreVO } from '../types/course'
+import { isLoggedIn } from '../utils/auth'
 
 /* ===== Mock Data ===== */
 
@@ -100,11 +101,15 @@ export function getChapterList(cid: number): Promise<{ list: ChapterListItem[] }
   )
 }
 export function getChapterDetail(chId: number, cid: number): Promise<ChapterDetailVO> {
+  if (!isLoggedIn()) return Promise.reject(new Error('unauthorized'))
   return http.get<ChapterDetailVO>('/student/chapter/detail', { chId, cid }).catch(() => {
     const mockChapterDetail: ChapterDetailVO = {
       id: chId,
       mediaSrc: 'https://media.w3.org/2010/05/sintel/trailer.mp4',
       mediaType: 'video',
+      videoList: [
+        { id: 1, videoName: '课程导学', videoUrl: 'https://media.w3.org/2010/05/sintel/trailer.mp4', fileSize: 1024 * 1024 * 12 },
+      ],
       article: '## 本章导读\n\n本章主要介绍课程的整体架构、学习目标与前置知识要求。\n\n### 学习要点\n1. 理解课程定位与学习路径\n2. 掌握基础概念与核心原理\n3. 完成环境搭建与工具配置\n\n学习完成后请完成课后习题巩固知识点。',
       attachList: [
         { id: 1, fileName: '第1章学习大纲.pdf', fileSize: '2.3MB' },
@@ -117,5 +122,6 @@ export function getChapterDetail(chId: number, cid: number): Promise<ChapterDeta
 
 /** 获取课程综合成绩（不使用mock，直接请求后端） */
 export function getCourseScore(courseId: number): Promise<CourseScoreVO | null> {
-  return http.get<CourseScoreVO | null>(`/student/course/${courseId}/score`)
+  if (!isLoggedIn()) return Promise.resolve(null)
+  return http.get<CourseScoreVO | null>(`/student/course/${courseId}/score`, undefined, undefined, { requireAuth: true })
 }

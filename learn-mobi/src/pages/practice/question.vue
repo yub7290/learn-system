@@ -271,7 +271,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getPracticeQuestions, submitAnswer, toggleFavorite, createNote } from '../../api/practice'
+import { getPracticeQuestions, submitAnswer, toggleFavorite, createNote, updateNote, getNoteForQuestion } from '../../api/practice'
 import type { PracticeQuestionVO } from '../../types/practice'
 
 /* ====== 类型/颜色映射 ====== */
@@ -293,6 +293,7 @@ const mode = ref<'answer' | 'recite'>('answer')
 const showCardModal = ref(false)
 const showNoteModal = ref(false)
 const draftNote = ref('')
+const currentNoteId = ref<number | null>(null) // 当前题目的笔记ID（用于区分新增/更新）
 
 /* ====== 答案状态（本地跟踪） ====== */
 interface AnswerState {
@@ -483,13 +484,22 @@ function openNote() {
 async function saveNote() {
   const q = currentQuestion.value
   if (!q) return
-  localNote.value = draftNote.value
+  const prevNote = localNote.value
+  const prevNoteId = currentNoteId.value
   showNoteModal.value = false
-  uni.showToast({ title: '笔记已保存', icon: 'success' })
   try {
-    await createNote({ courseId: courseId.value, questionId: q.id, noteContent: draftNote.value })
+    if (currentNoteId.value) {
+      await updateNote(currentNoteId.value, draftNote.value)
+    } else {
+      const result = await createNote({ courseId: courseId.value, questionId: q.id, noteContent: draftNote.value })
+      if (result?.id) currentNoteId.value = result.id
+    }
+    localNote.value = draftNote.value
+    uni.showToast({ title: '笔记已保存', icon: 'success' })
   } catch {
-    // 本地保存
+    localNote.value = prevNote
+    currentNoteId.value = prevNoteId
+    uni.showToast({ title: '保存失败，请重试', icon: 'none' })
   }
 }
 
@@ -529,6 +539,7 @@ function restoreQuestionState() {
   if (!q) return
   const ans = answerMap.value[q.id]
   localNote.value = ''
+  currentNoteId.value = null
 
   if (ans?.submitted) {
     if (q.questionType === 1) multiSelected.value = ans.answer.split(',').filter(Boolean)
@@ -538,6 +549,23 @@ function restoreQuestionState() {
     selAnswer.value = ''
     multiSelected.value = []
     textAnswer.value = ''
+  }
+
+  // 加载该题目已有的笔记
+  loadNoteForQuestion(q.id)
+}
+
+async function loadNoteForQuestion(questionId: number) {
+  try {
+    const notes = await getNoteForQuestion(questionId)
+    if (notes && notes.length > 0) {
+      // 取最新的笔记
+      const latest = notes[0]
+      localNote.value = latest.noteContent
+      currentNoteId.value = latest.id
+    }
+  } catch {
+    // 静默失败
   }
 }
 

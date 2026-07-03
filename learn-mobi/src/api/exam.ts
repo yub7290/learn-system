@@ -1,4 +1,5 @@
 import { http } from './request'
+import { isLoggedIn } from '../utils/auth'
 import type {
   ExamVO,
   ExamDetailVO,
@@ -24,6 +25,7 @@ export function getExamList(params?: {
   pageNum?: number
   pageSize?: number
 }): Promise<{ list: ExamVO[]; total: number }> {
+  if (!isLoggedIn()) return Promise.resolve({ list: [], total: 0 })
   return http.get<{ list: ExamVO[]; total: number }>('/student/exam/list', params)
 }
 
@@ -32,6 +34,7 @@ export function getExamList(params?: {
  * @param id 考试ID
  */
 export function getExamDetail(id: number): Promise<ExamDetailVO> {
+  if (!isLoggedIn()) return Promise.reject(new Error('unauthorized'))
   return http.get<ExamDetailVO>('/student/exam/info/' + id)
 }
 
@@ -40,7 +43,7 @@ export function getExamDetail(id: number): Promise<ExamDetailVO> {
  * @param examId 考试ID
  */
 export function getExamQuestions(examId: number): Promise<ExamQuestionVO[]> {
-  return http.get<ExamQuestionVO[]>('/student/exam/questions', { examId })
+  return http.get<ExamQuestionVO[]>('/student/exam/questions', { examId }, undefined, { requireAuth: true })
 }
 
 /**
@@ -48,7 +51,7 @@ export function getExamQuestions(examId: number): Promise<ExamQuestionVO[]> {
  * @param data 提交参数
  */
 export function submitExam(data: ExamSubmitDTO): Promise<ExamResultVO> {
-  return http.post<ExamResultVO>('/student/exam/submit', data)
+  return http.post<ExamResultVO>('/student/exam/submit', data, undefined, { requireAuth: true })
 }
 
 /**
@@ -56,7 +59,7 @@ export function submitExam(data: ExamSubmitDTO): Promise<ExamResultVO> {
  * @param examId 考试ID
  */
 export function clearExamHistory(examId: number): Promise<void> {
-  return http.delete<void>('/student/exam/history/' + examId)
+  return http.delete<void>('/student/exam/history/' + examId, undefined, undefined, { requireAuth: true })
 }
 
 /**
@@ -64,6 +67,7 @@ export function clearExamHistory(examId: number): Promise<void> {
  * @param courseId 课程ID
  */
 export function getCourseFinalExam(courseId: number): Promise<FinalExamVO | null> {
+  if (!isLoggedIn()) return Promise.resolve(null)
   return http.get<FinalExamVO | null>('/student/course/' + courseId + '/final-exam')
 }
 
@@ -72,7 +76,7 @@ export function getCourseFinalExam(courseId: number): Promise<FinalExamVO | null
  * @param examId 考试ID
  */
 export function startExam(examId: number): Promise<StartExamVO> {
-  return http.post<StartExamVO>('/student/exam/' + examId + '/start')
+  return http.post<StartExamVO>('/student/exam/' + examId + '/start', undefined, undefined, { requireAuth: true })
 }
 
 /**
@@ -80,7 +84,7 @@ export function startExam(examId: number): Promise<StartExamVO> {
  * @param recordId 考试记录ID
  */
 export function heartbeat(recordId: number): Promise<void> {
-  return http.put<void>('/student/exam/record/' + recordId + '/heartbeat')
+  return http.put<void>('/student/exam/record/' + recordId + '/heartbeat', undefined, undefined, { requireAuth: true, showError: false })
 }
 
 /**
@@ -88,7 +92,7 @@ export function heartbeat(recordId: number): Promise<void> {
  * @param recordId 考试记录ID
  */
 export function getExamResult(recordId: number): Promise<ExamResultVO> {
-  return http.get<ExamResultVO>('/student/exam/record/' + recordId + '/result')
+  return http.get<ExamResultVO>('/student/exam/record/' + recordId + '/result', undefined, undefined, { requireAuth: true })
 }
 
 /** Mock 监考行为记录 */

@@ -160,9 +160,10 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import TabBar from '../../components/TabBar.vue'
 import { getStudentHomeData } from '../../api/student'
+import { requireLogin } from '../../utils/auth'
 import type { TodayStatsVO, WeekStatsVO, DailyTaskVO, BadgeVO } from '../../types/student'
 
-const studentName = ref('小明')
+const studentName = ref('')
 const growthValue = ref(0)
 const todayStats = ref<TodayStatsVO>({ duration: 0, streak: 0, knowledge: 0 })
 const weekTotal = ref<WeekStatsVO>({ duration: 0, questions: 0, knowledge: 0 })
@@ -191,21 +192,33 @@ onShow(async () => {
     badgeList.value = data.badgeList
     highlightTip.value = data.highlightTip
   } catch {
-    /* mock API 不会出错 */
+    /* 数据加载失败时保留空态 */
   }
 })
 
 function goToOverview(): void {
+  if (!requireLogin('登录后才能查看学习能力总览')) return
   uni.navigateTo({ url: '/pages/student-overview/overview' })
 }
 
 function goToWeekPlan(): void {
+  if (!requireLogin('登录后才能查看学习周计划')) return
   uni.navigateTo({ url: '/pages/student-overview/weekly' })
 }
 
 function handleTaskClick(task: DailyTaskVO): void {
   if (task.done) {
     uni.showToast({ title: '任务已完成', icon: 'none' })
+    return
+  }
+  if (!requireLogin('登录后才能查看学习任务')) return
+  const params = 'taskId=' + task.id + '&knowledge=' + encodeURIComponent(task.knowledge)
+  if (task.type === 'course' || task.type === 'learn' || task.type === 'preview') {
+    uni.navigateTo({ url: '/pages/course/detail?id=' + task.id + '&' + params })
+    return
+  }
+  if (task.type === 'practice' || task.type === 'review') {
+    uni.navigateTo({ url: '/pages/practice/question?' + params })
     return
   }
   uni.navigateTo({ url: '/pages/student-overview/weekly?taskId=' + task.id })

@@ -38,6 +38,7 @@
             v-model="formData.realName"
             placeholder="请输入真实姓名"
             maxlength="20"
+            disabled="true"
           />
         </view>
         <view class="form-divider"></view>
@@ -95,16 +96,6 @@
             maxlength="50"
           />
         </view>
-        <view class="form-divider"></view>
-        <view class="form-item">
-          <text class="form-label">年级</text>
-          <input
-            class="form-input"
-            v-model="formData.gradeName"
-            placeholder="请输入年级"
-            maxlength="20"
-          />
-        </view>
       </view>
 
       <view class="bottom-space"></view>
@@ -119,7 +110,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getPersonalInfo, updatePersonalInfo } from '../../api/mine'
+import { getPersonalInfo, updatePersonalInfo, uploadAvatar } from '../../api/mine'
 import type { PersonalInfoVO } from '../../types/mine'
 
 interface FormData {
@@ -130,7 +121,6 @@ interface FormData {
   email: string
   birthday: string
   schoolName: string
-  gradeName: string
 }
 
 const formData = ref<FormData>({
@@ -141,7 +131,6 @@ const formData = ref<FormData>({
   email: '',
   birthday: '',
   schoolName: '',
-  gradeName: '',
 })
 
 const genderOptions: string[] = ['男', '女']
@@ -158,44 +147,40 @@ onMounted(async () => {
       email: info.email || '',
       birthday: info.birthday || '',
       schoolName: info.schoolName || '',
-      gradeName: info.gradeName || '',
     }
     if (info.gender === 1) genderIndex.value = 0
     else if (info.gender === 2) genderIndex.value = 1
     else genderIndex.value = -1
   } catch (e) {
-    loadMockData()
+    console.error('获取个人信息失败', e)
   }
 })
-
-function loadMockData() {
-  formData.value = {
-    nickname: '学习用户001',
-    realName: '张三',
-    avatarUrl: '',
-    phone: '138****8888',
-    email: 'zhangsan@example.com',
-    birthday: '2000-01-01',
-    schoolName: '示例大学',
-    gradeName: '大一',
-  }
-  genderIndex.value = 0
-}
 
 function onGenderChange(e: any) {
   genderIndex.value = e.detail.value
 }
 
-function handleAvatar() {
-  uni.chooseImage({
-    count: 1,
-    sizeType: ['compressed'],
-    sourceType: ['album', 'camera'],
-    success: (res) => {
-      const tempPath = res.tempFilePaths[0]
-      formData.value.avatarUrl = tempPath
-    },
-  })
+async function handleAvatar() {
+  try {
+    const res: any = await new Promise((resolve, reject) => {
+      uni.chooseImage({
+        count: 1,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: resolve,
+        fail: reject,
+      })
+    })
+    const tempPath = res.tempFilePaths[0]
+    uni.showLoading({ title: '上传头像中...' })
+    const url = await uploadAvatar(tempPath)
+    formData.value.avatarUrl = url
+    uni.hideLoading()
+  } catch (e: any) {
+    uni.hideLoading()
+    if (e?.errMsg?.includes('cancel')) return
+    uni.showToast({ title: e?.message || '头像上传失败', icon: 'none' })
+  }
 }
 
 function handleSubmit() {
@@ -216,23 +201,17 @@ function handleSubmit() {
     gender: genderValue,
     birthday: formData.value.birthday,
     schoolName: formData.value.schoolName,
-    gradeName: formData.value.gradeName,
   }
 
   updatePersonalInfo(submitData)
     .then(() => {
       uni.hideLoading()
       uni.showToast({ title: '保存成功', icon: 'success' })
-      setTimeout(() => {
-        uni.navigateBack()
-      }, 1500)
+      setTimeout(() => uni.navigateBack(), 1500)
     })
-    .catch(() => {
+    .catch((err) => {
       uni.hideLoading()
-      uni.showToast({ title: '保存成功', icon: 'success' })
-      setTimeout(() => {
-        uni.navigateBack()
-      }, 1500)
+      uni.showToast({ title: err?.message || '保存失败', icon: 'none' })
     })
 }
 
@@ -249,7 +228,7 @@ function goBack() {
 
 .content-scroll {
   width: 100%;
-  padding-top: 12px;
+  padding-top: 64px;
   box-sizing: border-box;
 }
 

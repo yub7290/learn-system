@@ -1,38 +1,43 @@
 import type {
   MineCentreVO,
   MyCourseItemVO,
+  LoginLogVO,
   StudyCardVO,
   PointsAccountVO,
   PointsRecordVO,
   PointsProductVO,
   PersonalInfoVO,
+  ExchangeResultVO,
 } from '../types/mine'
+import { isLoggedIn } from '../utils/auth'
+import { http, uploadFile } from './request'
+
+const emptyPersonalInfo: PersonalInfoVO = {
+  id: 0,
+  nickname: '',
+  avatarUrl: '',
+  realName: '',
+  phone: '',
+  email: '',
+  gender: 0,
+  birthday: '',
+  schoolName: '',
+}
 
 /**
  * 获取个人中心汇总信息
  */
 export function getMineCentre(): Promise<MineCentreVO> {
-  return Promise.resolve({
-    userInfo: {
-      id: 1,
-      nickname: '学习用户001',
-      avatarUrl: '/static/default-avatar.png',
-      realName: '张三',
-      phone: '138****8888',
-      email: 'zhangsan@example.com',
-      gender: 1,
-      birthday: '2000-01-01',
-      schoolName: '示例大学',
-      gradeName: '大一',
-    },
-    pointsAccount: {
-      availablePoints: 5800,
-      totalPoints: 12000,
-    },
-    studyingCourseCount: 3,
-    completedCourseCount: 5,
-    examCount: 12,
-  })
+  if (!isLoggedIn()) {
+    return Promise.resolve({
+      userInfo: emptyPersonalInfo,
+      pointsAccount: { availablePoints: 0, totalPoints: 0 },
+      studyingCourseCount: 0,
+      completedCourseCount: 0,
+      examCount: 0,
+    })
+  }
+  return http.get<MineCentreVO>('/app/profile/centre')
 }
 
 /**
@@ -41,89 +46,77 @@ export function getMineCentre(): Promise<MineCentreVO> {
 export function getMyCourseList(params: {
   page: number
   pageSize: number
-  status?: number
 }): Promise<{ list: MyCourseItemVO[]; total: number }> {
-  const allCourses: MyCourseItemVO[] = [
-    {
-      id: 1,
-      name: '高等数学基础精讲',
-      coverUrl: 'https://picsum.photos/320/240?random=1',
-      totalLessonCount: 48,
-      learnedLessonCount: 36,
-      progressPercent: 75,
-      lastStudyTime: '2026-06-20 14:30',
-    },
-    {
-      id: 2,
-      name: '大学英语四级冲刺',
-      coverUrl: 'https://picsum.photos/320/240?random=2',
-      totalLessonCount: 36,
-      learnedLessonCount: 16,
-      progressPercent: 45,
-      lastStudyTime: '2026-06-18 09:15',
-    },
-    {
-      id: 3,
-      name: '计算机网络原理',
-      coverUrl: 'https://picsum.photos/320/240?random=3',
-      totalLessonCount: 32,
-      learnedLessonCount: 32,
-      progressPercent: 100,
-      lastStudyTime: '2026-05-30 16:00',
-    },
-    {
-      id: 4,
-      name: 'Python入门体验课',
-      coverUrl: 'https://picsum.photos/320/240?random=4',
-      totalLessonCount: 12,
-      learnedLessonCount: 3,
-      progressPercent: 25,
-      lastStudyTime: '2026-06-22 11:00',
-    },
-  ]
-  return Promise.resolve({ list: allCourses, total: allCourses.length })
+  if (!isLoggedIn()) return Promise.resolve({ list: [], total: 0 })
+  return http.post<{ records: Array<{
+    id: number
+    name: string
+    imageUrl: string
+    totalCourseTime: number
+    learnProgress: number
+    recentLearnTime: string | null
+  }>; total: number }>('/app/profile/myCourse', {
+    pageParam: { pageNum: params.page, pageSize: params.pageSize },
+    queryParam: {},
+  }).then((res) => ({
+    list: (res.records || []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      coverUrl: item.imageUrl,
+      totalLessonCount: item.totalCourseTime,
+      learnedLessonCount: Math.round(item.learnProgress * item.totalCourseTime / 100),
+      progressPercent: item.learnProgress,
+      lastStudyTime: item.recentLearnTime || '',
+    })),
+    total: res.total || 0,
+  }))
 }
 
 /**
- * 获取学习卡列表
+ * 获取学习卡汇总信息
  */
-export function getStudyCardList(): Promise<StudyCardVO[]> {
-  return Promise.resolve([
-    {
-      id: 1,
-      name: '年度学习卡',
-      cardType: 1,
-      validStartTime: '2024-01-01',
-      validEndTime: '2024-12-31',
-      valid: true,
-    },
-    {
-      id: 2,
-      name: '季度学习卡',
-      cardType: 2,
-      validStartTime: '2024-03-01',
-      validEndTime: '2025-02-28',
-      valid: true,
-    },
-    {
-      id: 3,
-      name: '体验学习卡',
-      cardType: 3,
-      validStartTime: '2024-06-01',
-      validEndTime: '2024-08-31',
-      valid: false,
-    },
-  ])
+export function getStudyCardSummary(): Promise<{ totalCount: number; usedCount: number }> {
+  if (!isLoggedIn()) return Promise.resolve({ totalCount: 0, usedCount: 0 })
+  return http.get<{ totalCount: number; usedCount: number }>('/app/study-card/summary')
+}
+
+/**
+ * 获取我的学习卡列表（分页）
+ */
+export function getMyStudyCards(params: {
+  page: number
+  pageSize: number
+}): Promise<{ list: StudyCardVO[]; total: number }> {
+  if (!isLoggedIn()) return Promise.resolve({ list: [], total: 0 })
+  return http.post<{ records: StudyCardVO[]; total: number }>('/app/study-card/my', {
+    pageParam: { pageNum: params.page, pageSize: params.pageSize },
+    queryParam: {},
+  }).then((res) => ({
+    list: res.records || [],
+    total: res.total || 0,
+  }))
+}
+
+/**
+ * 使用学习卡
+ */
+export function useStudyCard(cardNo: string): Promise<void> {
+  return http.post<void>('/app/study-card/use', { cardNo })
+}
+
+/**
+ * 暂存学习卡
+ */
+export function saveStudyCard(cardNo: string): Promise<void> {
+  return http.post<void>('/app/study-card/save', { cardNo })
 }
 
 /**
  * 获取积分账户信息
  */
 export function getPointsAccount(): Promise<PointsAccountVO> {
-  return Promise.resolve({
-    availablePoints: 5800,
-    totalPoints: 12000,
-  })
+  if (!isLoggedIn()) return Promise.resolve({ availablePoints: 0, totalPoints: 0 })
+  return http.get<PointsAccountVO>('/app/profile/points')
 }
 
 /**
@@ -133,13 +126,10 @@ export function getPointsRecordList(params: {
   page: number
   pageSize: number
 }): Promise<{ list: PointsRecordVO[]; total: number }> {
-  const records: PointsRecordVO[] = [
-    { id: 1, points: 100, changeType: 1, description: '每日签到', createTime: '2026-06-25 08:00' },
-    { id: 2, points: 200, changeType: 1, description: '完成课程学习', createTime: '2026-06-24 15:30' },
-    { id: 3, points: 500, changeType: 2, description: '兑换学习卡', createTime: '2026-06-20 10:00' },
-    { id: 4, points: 50, changeType: 1, description: '分享得积分', createTime: '2026-06-19 12:00' },
-  ]
-  return Promise.resolve({ list: records, total: records.length })
+  if (!isLoggedIn()) return Promise.resolve({ list: [], total: 0 })
+  return http.post<{ records: PointsRecordVO[]; total: number }>('/app/profile/points/records', {
+    pageParam: { pageNum: params.page, pageSize: params.pageSize },
+  }).then((res) => ({ list: res.records || [], total: res.total || 0 }))
 }
 
 /**
@@ -149,40 +139,33 @@ export function getPointsProductList(params: {
   page: number
   pageSize: number
 }): Promise<{ list: PointsProductVO[]; total: number }> {
-  const products: PointsProductVO[] = [
-    { id: 1, name: '语文进阶学习月卡', imageUrl: 'https://picsum.photos/id/24/200/200', requiredPoints: 1000, stockCount: 99 },
-    { id: 2, name: '全科知识点季卡', imageUrl: 'https://picsum.photos/id/42/200/200', requiredPoints: 2500, stockCount: 50 },
-    { id: 3, name: '定制笔记本套装', imageUrl: 'https://picsum.photos/id/20/200/200', requiredPoints: 800, stockCount: 30 },
-    { id: 4, name: '古诗词必背手册', imageUrl: 'https://picsum.photos/id/28/200/200', requiredPoints: 1200, stockCount: 20 },
-  ]
-  return Promise.resolve({ list: products, total: products.length })
+  return http.post<{ records: PointsProductVO[]; total: number }>('/app/profile/points/products', {
+    pageParam: { pageNum: params.page, pageSize: params.pageSize },
+  }).then((res) => ({ list: res.records || [], total: res.total || 0 }))
 }
 
 /**
  * 积分兑换商品
  */
 export function exchangePointsProduct(
-  productId: number
-): Promise<{ success: boolean; orderId?: number }> {
-  return Promise.resolve({ success: true, orderId: Date.now() })
+  productId: number,
+  exchangeType: number,
+  addressId?: number
+): Promise<ExchangeResultVO> {
+  if (!isLoggedIn()) return Promise.reject(new Error('unauthorized'))
+  return http.post<ExchangeResultVO>('/app/profile/points/exchange', {
+    productId,
+    exchangeType,
+    addressId,
+  })
 }
 
 /**
  * 获取个人信息
  */
 export function getPersonalInfo(): Promise<PersonalInfoVO> {
-  return Promise.resolve({
-    id: 1,
-    nickname: '学习用户001',
-    avatarUrl: '/static/default-avatar.png',
-    realName: '张三',
-    phone: '138****8888',
-    email: 'zhangsan@example.com',
-    gender: 1,
-    birthday: '2000-01-01',
-    schoolName: '示例大学',
-    gradeName: '大一',
-  })
+  if (!isLoggedIn()) return Promise.resolve(emptyPersonalInfo)
+  return http.get<PersonalInfoVO>('/app/profile/getInfo')
 }
 
 /**
@@ -191,16 +174,47 @@ export function getPersonalInfo(): Promise<PersonalInfoVO> {
 export function updatePersonalInfo(
   data: Partial<PersonalInfoVO>
 ): Promise<PersonalInfoVO> {
-  return Promise.resolve({
-    id: 1,
-    nickname: data.nickname || '学习用户001',
-    avatarUrl: data.avatarUrl || '/static/default-avatar.png',
-    realName: data.realName || '',
-    phone: data.phone || '',
-    email: data.email || '',
-    gender: data.gender ?? 0,
-    birthday: data.birthday || '',
-    schoolName: data.schoolName || '',
-    gradeName: data.gradeName || '',
-  })
+  if (!isLoggedIn()) return Promise.reject(new Error('unauthorized'))
+  return http.post<PersonalInfoVO>('/app/profile/updateInfo', data)
+}
+
+/**
+ * 上传头像图片到七牛云，返回持久化 URL
+ */
+export function uploadAvatar(filePath: string): Promise<string> {
+  return uploadFile({ filePath, formData: { directory: 'edu/avatar' } })
+}
+
+/**
+ * 获取登录日志
+ */
+export function getLoginLogList(): Promise<LoginLogVO[]> {
+  if (!isLoggedIn()) return Promise.resolve([])
+  return http.get<LoginLogVO[]>('/app/profile/loginLog')
+}
+
+/**
+ * 注册新用户
+ */
+export function register(data: {
+  account: string
+  password: string
+  captchaKey: string
+  captchaCode: string
+}): Promise<void> {
+  return http.post<void>('/student/auth/register', data, undefined, { skipAuth: true })
+}
+
+/**
+ * 记录分享行为
+ */
+export function shareRecord(): Promise<void> {
+  return http.post<void>('/app/share/record')
+}
+
+/**
+ * 分享注册奖励
+ */
+export function shareRegister(inviterId: number): Promise<void> {
+  return http.post<void>('/app/share/register', { inviterId })
 }

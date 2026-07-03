@@ -70,15 +70,13 @@ import { onShow } from '@dcloudio/uni-app'
 import CourseCard from '../../components/CourseCard.vue'
 import TabBar from '../../components/TabBar.vue'
 import { getHomeBase, getHomeTeacher, getHomeCourse } from '../../api/home'
-import { getExamList } from '../../api/exam'
+import { requireLogin } from '../../utils/auth'
 import type { NavItem, TeacherItem, HomeCourseItem } from '../../types/home'
-import type { ExamVO } from '../../types/exam'
 
 const bannerList = ref<{ image: string; url: string }[]>([])
 const navList = ref<NavItem[]>([])
 const teacherList = ref<TeacherItem[]>([])
 const courseList = ref<HomeCourseItem[]>([])
-const examList = ref<ExamVO[]>([])
 
 /** 首页导航项 */
 const navData: NavItem[] = [
@@ -96,20 +94,30 @@ async function loadData() {
   navList.value = navData
   try { const t = await getHomeTeacher(); teacherList.value = t.list || [] } catch (e) { /* ignore */ }
   try { const c = await getHomeCourse(); courseList.value = c.list || [] } catch (e) { /* ignore */ }
-  try { const examRes = await getExamList(); examList.value = (examRes.list || []).slice(0, 6) } catch (e) { /* ignore */ }
 }
 
 onShow(loadData)
 
-function goLink(url: string) { if (url) uni.navigateTo({ url }).catch(() => {}) }
+function goLink(url: string) {
+  if (!url) return
+  if (url === '/pages/exam/exam' && !requireLogin('登录后才能查看你的在线考试')) return
+  if (url === '/pages/mine/mine' && !requireLogin('登录后才能查看我的学习')) return
+  uni.navigateTo({ url }).catch(() => {})
+}
 function goAI() { uni.navigateTo({ url: '/pages/ai/chat' }).catch(() => {}) }
 function goSearch() { uni.navigateTo({ url: '/pages/course/course' }).catch(() => {}) }
 function goTeacher(id: number) { uni.navigateTo({ url: `/pages/teacher/teacher?tid=${id}` }).catch(() => {}) }
 function goTeacherAll() { uni.navigateTo({ url: '/pages/teacher/teacher' }).catch(() => {}) }
 function goCourseAll() { uni.navigateTo({ url: '/pages/course/course' }).catch(() => {}) }
 function goCourseDetail(item: HomeCourseItem) { uni.navigateTo({ url: `/pages/course/detail?cid=${item.id}` }).catch(() => {}) }
-function goExamAll() { uni.navigateTo({ url: '/pages/exam/exam' }).catch(() => {}) }
-function goExam(id: number) { uni.navigateTo({ url: `/pages/exam/exam-detail?eid=${id}` }).catch(() => {}) }
+function goExamAll() {
+  if (!requireLogin('登录后才能查看你的在线考试')) return
+  uni.navigateTo({ url: '/pages/exam/exam' }).catch(() => {})
+}
+function goExam(id: number) {
+  if (!requireLogin('登录后才能查看考试详情')) return
+  uni.navigateTo({ url: `/pages/exam/exam-detail?eid=${id}` }).catch(() => {})
+}
 
 /** 根据导航名称返回对应的 iconfont class */
 function getNavIcon(name: string): string {

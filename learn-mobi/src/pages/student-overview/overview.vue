@@ -33,8 +33,12 @@
     </view>
 
     <scroll-view scroll-y class="page-scroll">
+      <view v-if="!weekReportList.length" class="empty-state">
+        <text>暂无学习总览数据</text>
+      </view>
+
       <!-- 学情总览卡片 -->
-      <view class="overview-card">
+      <view class="overview-card" v-else>
         <view class="overview-left">
           <text class="overview-label">综合能力评分</text>
           <view class="score-row">
@@ -53,7 +57,7 @@
       </view>
 
       <!-- 五维能力雷达 -->
-      <view class="section-card">
+      <view class="section-card" v-if="weekReportList.length">
         <view class="card-header">
           <text class="card-title">学习能力维度</text>
           <text class="card-sub">较上周对比</text>
@@ -81,8 +85,55 @@
         </view>
       </view>
 
-      <!-- 周学习时长 -->
+      <!-- 知识图谱 -->
       <view class="section-card">
+        <view class="card-header">
+          <text class="card-title">知识关联拓扑图谱</text>
+          <text class="card-sub">{{ subjectList.length ? '点击学科切换' : '全量知识点' }}</text>
+        </view>
+
+        <scroll-view v-if="subjectList.length" scroll-x class="tabs-scroll" show-scrollbar="false">
+          <view class="subject-tabs">
+            <view
+              class="tab-item"
+              :class="{ active: currentSubject === item.key }"
+              v-for="item in subjectList"
+              :key="item.key"
+              @click="switchSubject(item.key)"
+            >
+              <text>{{ item.name }}</text>
+            </view>
+          </view>
+        </scroll-view>
+
+        <view v-if="hasGraphData">
+          <KnowledgeGraph
+            :pre-nodes="graphPreNodes"
+            :core-node="graphCoreNode"
+            :next-nodes="graphNextNodes"
+            :width="650"
+            :height="320"
+          />
+
+          <view class="chain-box">
+            <view class="chain-item good">
+              <text class="chain-label">掌握良好链路</text>
+              <text class="chain-text">{{ currentGraph.goodChain || '暂无掌握良好链路' }}</text>
+            </view>
+            <view class="chain-item weak">
+              <text class="chain-label">薄弱知识链路</text>
+              <text class="chain-text">{{ currentGraph.weakChain || '暂无薄弱知识链路' }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view v-else class="empty-state compact">
+          <text>暂无知识图谱数据</text>
+        </view>
+      </view>
+
+      <!-- 周学习时长 -->
+      <view class="section-card" v-if="weekReportList.length">
         <view class="card-header">
           <text class="card-title">周学习时长</text>
           <text class="card-sub">单位：分钟</text>
@@ -102,71 +153,22 @@
         </view>
       </view>
 
-      <!-- 知识图谱 -->
-      <view class="section-card">
-        <view class="card-header">
-          <text class="card-title">知识关联拓扑图谱</text>
-          <text class="card-sub">点击学科切换</text>
-        </view>
-
-        <scroll-view scroll-x class="tabs-scroll" show-scrollbar="false">
-          <view class="subject-tabs">
-            <view
-              class="tab-item"
-              :class="{ active: currentSubject === item.key }"
-              v-for="item in subjectList"
-              :key="item.key"
-              @click="switchSubject(item.key)"
-            >
-              <text>{{ item.name }}</text>
-            </view>
-          </view>
-        </scroll-view>
-
-        <KnowledgeGraph
-          :pre-nodes="graphPreNodes"
-          :core-node="graphCoreNode"
-          :next-nodes="graphNextNodes"
-          :width="650"
-          :height="320"
-        />
-
-        <view class="chain-box">
-          <view class="chain-item good">
-            <text class="chain-label">掌握良好链路</text>
-            <text class="chain-text">{{ currentGraph.goodChain }}</text>
-          </view>
-          <view class="chain-item weak">
-            <text class="chain-label">薄弱知识链路</text>
-            <text class="chain-text">{{ currentGraph.weakChain }}</text>
-          </view>
-        </view>
-      </view>
-
       <!-- 学情总结 -->
-      <view class="section-card">
+      <view class="section-card" v-if="weekReportList.length">
         <view class="card-header">
           <text class="card-title">学情总结与建议</text>
         </view>
         <view class="summary-section">
           <text class="summary-title">本周优势</text>
-          <text class="summary-text">
-            专注力与理解归纳能力提升明显，课堂专注度较上周提升8%，对基础概念的吸收效率较高；基础概念类知识点掌握扎实。
-          </text>
+          <text class="summary-text">{{ currentReport.advantageSummary || '暂无足够学习数据生成优势分析。' }}</text>
         </view>
         <view class="summary-section">
           <text class="summary-title">薄弱环节</text>
-          <text class="summary-text">
-            纠错复盘能力有待加强，同类错题重复出现；进阶运算类知识点熟练度不足，综合应用题型失分较多，导致整体解题速度偏慢。
-          </text>
+          <text class="summary-text">{{ currentReport.weakSummary || '暂无明显薄弱环节。' }}</text>
         </view>
         <view class="summary-section">
           <text class="summary-title">学习建议</text>
-          <text class="summary-text">
-            1. 每日增加15分钟错题复盘，重点整理薄弱题型的错题；
-            2. 优先补强当前核心基础知识点，针对性训练薄弱题型；
-            3. 每周完成2套综合题型专项训练，强化知识点综合运用能力。
-          </text>
+          <text class="summary-text">{{ currentReport.studySuggestion || '请先完成课程学习和专项练习，系统会持续生成学习建议。' }}</text>
         </view>
       </view>
 
@@ -212,19 +214,32 @@ import type { WeekReportVO, AbilityScoreVO, DurationItemVO, SubjectItemVO, Subje
 
 const currentWeekIndex = ref(0)
 const showWeekPicker = ref(false)
-const currentSubject = ref('math')
+const currentSubject = ref('')
 const weekReportList = ref<WeekReportVO[]>([])
 const subjectList = ref<SubjectItemVO[]>([])
+const emptyReport: WeekReportVO = {
+  weekName: '',
+  totalScore: 0,
+  totalDiff: 0,
+  totalDuration: 0,
+  studyDays: 0,
+  masteryOffset: 0,
+  abilityList: [],
+  durationList: [],
+  advantageSummary: '',
+  weakSummary: '',
+  studySuggestion: '',
+}
 const currentGraph = ref<SubjectGraphVO>({
   preNodes: [],
-  coreNode: { id: 0, name: '核心', mastery: 75, type: 'core', questionTypes: [] },
+  coreNode: { id: 0, name: '', mastery: 0, type: 'core', questionTypes: [] },
   nextNodes: [],
   goodChain: '',
   weakChain: '',
 })
 
 const currentReport = computed<WeekReportVO>(() => {
-  return weekReportList.value[currentWeekIndex.value] || weekReportList.value[0]
+  return weekReportList.value[currentWeekIndex.value] || weekReportList.value[0] || emptyReport
 })
 
 const abilityList = computed<AbilityScoreVO[]>(() => currentReport.value.abilityList || [])
@@ -261,9 +276,14 @@ const graphNextNodes = computed<GraphNodeVO[]>(() => {
   return currentGraph.value.nextNodes.map((n) => ({ id: n.id, name: n.name, mastery: n.mastery }))
 })
 
+const hasGraphData = computed(() => {
+  return !!currentGraph.value.coreNode.name || graphPreNodes.value.length > 0 || graphNextNodes.value.length > 0
+})
+
 onShow(async () => {
   weekReportList.value = await getWeekReportList()
   subjectList.value = await getSubjectList()
+  currentSubject.value = subjectList.value[0]?.key || ''
   await loadGraph()
 })
 
@@ -460,6 +480,22 @@ function goBack(): void {
   box-sizing: border-box;
   box-shadow: $shadow-card;
   margin-bottom: 24rpx;
+}
+.empty-state {
+  width: 100%;
+  min-height: 260rpx;
+  background: $bg-card;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-3;
+  font-size: 26rpx;
+  margin-bottom: 24rpx;
+}
+.empty-state.compact {
+  min-height: 180rpx;
+  margin-bottom: 0;
 }
 .card-header {
   display: flex;

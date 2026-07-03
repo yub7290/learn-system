@@ -46,6 +46,7 @@ import { onShow } from '@dcloudio/uni-app'
 import TabBar from '../../components/TabBar.vue'
 import ExamCard from '../../components/ExamCard.vue'
 import { getExamList } from '../../api/exam'
+import { requireLogin } from '../../utils/auth'
 import type { ExamVO } from '../../types/exam'
 
 /**
@@ -119,6 +120,7 @@ function onLoadMore() {
 }
 
 function handleCardClick(item: ExamVO) {
+  if (!requireLogin('登录后才能查看考试详情')) return
   uni.navigateTo({ url: `/pages/exam/exam-detail?id=${item.id}` })
 }
 

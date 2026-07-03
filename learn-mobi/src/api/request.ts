@@ -1,5 +1,5 @@
 import { BASE_URL, PUBLIC_PATHS } from '../env'
-import { getAccessToken, getRefreshToken, setTokens, redirectLogin } from '../utils/auth'
+import { clearTokens, getAccessToken, getRefreshToken, requireLogin, setTokens } from '../utils/auth'
 import type { Response } from '../types/response'
 
 /** 续签队列:纯逻辑,可单测 */
@@ -28,6 +28,10 @@ export interface RequestOptions {
   header?: Record<string, string>
   /** 为 true 时即使有 token 也不带 Authorization(如刷新接口本身) */
   skipAuth?: boolean
+  /** 为 true 时 401 才提示登录,默认允许页面自行展示空态 */
+  requireAuth?: boolean
+  /** 为 false 时不展示业务错误 toast */
+  showError?: boolean
 }
 
 const queue = createRefreshQueue()
@@ -61,7 +65,7 @@ function doRefresh(): Promise<boolean> {
 
 /** 核心请求方法,返回 Promise<T>(T 为 Response.data) */
 export function request<T = any>(opts: RequestOptions): Promise<T> {
-  const { url, method = 'GET', data, header = {}, skipAuth = false } = opts
+  const { url, method = 'GET', data, header = {}, skipAuth = false, requireAuth = false, showError = true } = opts
   const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`
 
   const finalHeader: Record<string, string> = { 'Content-Type': 'application/json', ...header }
@@ -81,6 +85,14 @@ export function request<T = any>(opts: RequestOptions): Promise<T> {
             const r = res.data as Response<T>
             // 401 且该请求非刷新接口本身 → 尝试续签
             if (res.statusCode === 401 && !url.startsWith('/student/auth/refresh')) {
+              if (!getRefreshToken()) {
+                clearTokens()
+                if (requireAuth) {
+                  requireLogin('登录已过期,请重新登录')
+                }
+                reject(new Error('unauthorized'))
+                return
+              }
               if (queue.isRefreshing()) {
                 // 排队等刷新完成后重放
                 queue.enqueueRetry(() => {
@@ -89,27 +101,30 @@ export function request<T = any>(opts: RequestOptions): Promise<T> {
                 return
               }
               queue.startRefreshing()
-              const ok = await doRefresh()
+              const ok = getRefreshToken() ? await doRefresh() : false
               await queue.flushRetries(ok)
               if (ok) {
                 // 续签成功,重放本次
                 request<T>(opts).then(resolve).catch(reject)
               } else {
-                redirectLogin()
-                reject(new Error('登录已过期,请重新登录'))
+                clearTokens()
+                if (requireAuth) {
+                  requireLogin('登录已过期,请重新登录')
+                }
+                reject(new Error('unauthorized'))
               }
               return
             }
             // 响应体格式校验:防止网关返回非 JSON(HTML 错误页等)导致 r.code 未定义
             if (r == null || typeof r !== 'object' || typeof (r as any).code !== 'number') {
-              uni.showToast({ title: '服务器响应格式异常', icon: 'none' })
+              if (showError) uni.showToast({ title: '服务器响应格式异常', icon: 'none' })
               reject(new Error('invalid response body'))
               return
             }
             if (r.code === 200) {
               resolve(r.data)
             } else {
-              uni.showToast({ title: r.message || '请求失败', icon: 'none' })
+              if (showError) uni.showToast({ title: r.message || '请求失败', icon: 'none' })
               reject(new Error(r.message || `code ${r.code}`))
             }
           } catch (err) {
@@ -117,7 +132,7 @@ export function request<T = any>(opts: RequestOptions): Promise<T> {
           }
         },
         fail: () => {
-          uni.showToast({ title: '网络异常,请稍后重试', icon: 'none' })
+          if (showError) uni.showToast({ title: '网络异常,请稍后重试', icon: 'none' })
           reject(new Error('network error'))
         },
       })
@@ -126,13 +141,55 @@ export function request<T = any>(opts: RequestOptions): Promise<T> {
   })
 }
 
+export interface UploadOptions {
+  /** 文件本地路径（uni.chooseImage 返回的 tempFilePath） */
+  filePath: string
+  /** 后端文件字段名，默认 file */
+  name?: string
+  /** 额外表单字段 */
+  formData?: Record<string, string>
+}
+
+/** 文件上传，返回后端 Response.data 中的 URL 字符串 */
+export function uploadFile(opts: UploadOptions): Promise<string> {
+  const { filePath, name = 'file', formData: extra = {} } = opts
+  const fullUrl = `${BASE_URL}/edu/upload/image`
+  const header: Record<string, string> = {}
+  if (getAccessToken()) {
+    header['Authorization'] = `Bearer ${getAccessToken()}`
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    uni.uploadFile({
+      url: fullUrl,
+      filePath,
+      name,
+      formData: { ...extra },
+      header,
+      success: (res) => {
+        try {
+          const r = JSON.parse(res.data) as Response<string>
+          if (r.code === 200 && r.data) {
+            resolve(r.data)
+          } else {
+            reject(new Error(r.message || '上传失败'))
+          }
+        } catch {
+          reject(new Error('上传响应格式异常'))
+        }
+      },
+      fail: () => reject(new Error('上传网络异常')),
+    })
+  })
+}
+
 export const http = {
-  get: <T = any>(url: string, data?: any, header?: Record<string, string>) =>
-    request<T>({ url, method: 'GET', data, header }),
-  post: <T = any>(url: string, data?: any, header?: Record<string, string>) =>
-    request<T>({ url, method: 'POST', data, header }),
-  put: <T = any>(url: string, data?: any, header?: Record<string, string>) =>
-    request<T>({ url, method: 'PUT', data, header }),
-  delete: <T = any>(url: string, data?: any, header?: Record<string, string>) =>
-    request<T>({ url, method: 'DELETE', data, header }),
+  get: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth'>) =>
+    request<T>({ url, method: 'GET', data, header, ...options }),
+  post: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth'>) =>
+    request<T>({ url, method: 'POST', data, header, ...options }),
+  put: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth'>) =>
+    request<T>({ url, method: 'PUT', data, header, ...options }),
+  delete: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth'>) =>
+    request<T>({ url, method: 'DELETE', data, header, ...options }),
 }

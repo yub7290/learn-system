@@ -30,6 +30,7 @@ export interface ChapterDetailVO {
   mediaType: 'live' | 'video'
   article: string
   attachList: Array<{ id: number; fileName: string; fileSize: string }>
+  videoList?: Array<{ id?: number; videoName: string; videoUrl: string; fileSize?: number }>
 }
 export interface ChapterListItem { id: number; chapterName: string }
 

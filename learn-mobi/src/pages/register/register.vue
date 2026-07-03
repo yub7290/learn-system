@@ -1,6 +1,6 @@
 <template>
   <view class="login">
-    <view class="close-btn" @click="closeLogin">
+    <view class="close-btn" @click="goBack">
       <u-icon name="close" color="#fff" size="18"></u-icon>
     </view>
 
@@ -11,18 +11,23 @@
       <view class="brand-slogan">随时随地,学你所想</view>
     </view>
 
-    <!-- 登录卡 -->
+    <!-- 注册卡 -->
     <view class="login-card">
-      <view class="card-title">学员登录</view>
+      <view class="card-title">学员注册</view>
 
       <view class="field">
         <u-icon name="account" color="#0195ff" size="20"></u-icon>
-        <u-input v-model="form.account" placeholder="请输入账号" border="none" clearable></u-input>
+        <u-input v-model="form.account" placeholder="请输入手机号/账号" border="none" clearable></u-input>
       </view>
 
       <view class="field">
         <u-icon name="lock" color="#0195ff" size="20"></u-icon>
         <u-input v-model="form.password" placeholder="请输入密码" border="none" :password="true"></u-input>
+      </view>
+
+      <view class="field">
+        <u-icon name="lock" color="#0195ff" size="20"></u-icon>
+        <u-input v-model="form.confirmPassword" placeholder="请确认密码" border="none" :password="true"></u-input>
       </view>
 
       <view class="field">
@@ -34,11 +39,15 @@
         </view>
       </view>
 
-      <u-button type="primary" shape="circle" :loading="loading" @click="doLogin" custom-style="margin-top:18px;height:42px;background:linear-gradient(135deg,#0195ff,#00c6ff);border:none">登 录</u-button>
+      <view class="field" v-if="inviterId">
+        <u-icon name="gift" color="#0195ff" size="20"></u-icon>
+        <u-input v-model="inviterId" placeholder="邀请码" border="none" disabled></u-input>
+      </view>
+
+      <u-button type="primary" shape="circle" :loading="loading" @click="doRegister" custom-style="margin-top:18px;height:42px;background:linear-gradient(135deg,#0195ff,#00c6ff);border:none">注 册</u-button>
 
       <view class="links">
-        <text>忘记密码?</text>
-        <text class="link">注册账号</text>
+        <text class="link" @click="goBack">已有账号?去登录</text>
       </view>
     </view>
   </view>
@@ -47,53 +56,71 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getCaptcha } from '../../api/auth'
+import { register, shareRegister } from '../../api/mine'
 import { sm3Hash } from '../../utils/sm3'
-import { useUserStore } from '../../stores/user'
 
-const userStore = useUserStore()
-const form = ref({ account: '', password: '', captchaCode: '' })
+const form = ref({ account: '', password: '', confirmPassword: '', captchaCode: '' })
 const captcha = ref({ key: '', image: '' })
 const loading = ref(false)
+const inviterId = ref('')
 
-onMounted(loadCaptcha)
+onMounted(() => {
+  const pages = getCurrentPages()
+  const page = pages[pages.length - 1] as any
+  inviterId.value = page?.options?.inviter || ''
+  loadCaptcha()
+})
 
 async function loadCaptcha() {
   try {
     const res = await getCaptcha()
     captcha.value = res
-  } catch (e) {
+  } catch {
     // toast 已由 request 层提示
   }
 }
 
-async function doLogin() {
+async function doRegister() {
   if (!form.value.account || !form.value.password || !form.value.captchaCode) {
     uni.showToast({ title: '请填写完整', icon: 'none' })
     return
   }
+  if (form.value.password !== form.value.confirmPassword) {
+    uni.showToast({ title: '两次密码输入不一致', icon: 'none' })
+    return
+  }
   loading.value = true
   try {
-    await userStore.login({
+    await register({
       account: form.value.account,
       password: sm3Hash(form.value.password),
       captchaKey: captcha.value.key,
       captchaCode: form.value.captchaCode,
     })
-    uni.showToast({ title: '登录成功', icon: 'success' })
-    setTimeout(() => uni.reLaunch({ url: '/pages/index/index' }), 500)
-  } catch (e) {
-    loadCaptcha() // 验证码失效,刷新
+    if (inviterId.value) {
+      try {
+        await shareRegister(Number(inviterId.value))
+      } catch {
+        // 邀请奖励失败不阻断注册
+      }
+    }
+    uni.showToast({ title: '注册成功', icon: 'success' })
+    setTimeout(() => {
+      uni.reLaunch({ url: '/pages/login/login' })
+    }, 500)
+  } catch {
+    loadCaptcha()
   } finally {
     loading.value = false
   }
 }
 
-function closeLogin() {
+function goBack() {
   const pages = getCurrentPages()
   if (pages.length > 1) {
     uni.navigateBack()
   } else {
-    uni.reLaunch({ url: '/pages/index/index' })
+    uni.reLaunch({ url: '/pages/login/login' })
   }
 }
 </script>
@@ -134,6 +161,6 @@ function closeLogin() {
 .captcha-tap { width: auto; height: auto; display: flex; align-items: center; }
 .captcha-img { width: 120px; height: 48px; border-radius: 8px; }
 .captcha-img.placeholder { width: 120px; height: 48px; background: $primary-bg; color: $primary; font-size: 13px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
-.links { display: flex; justify-content: space-between; font-size: 12px; color: $text-3; margin-top: 12px; }
+.links { display: flex; justify-content: center; font-size: 12px; color: $text-3; margin-top: 12px; }
 .link { color: $primary; }
 </style>
