@@ -56,7 +56,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getCaptcha } from '../../api/auth'
-import { register, shareRegister } from '../../api/mine'
+import { register } from '../../api/mine'
 import { sm3Hash } from '../../utils/sm3'
 
 const form = ref({ account: '', password: '', confirmPassword: '', captchaCode: '' })
@@ -96,14 +96,9 @@ async function doRegister() {
       password: sm3Hash(form.value.password),
       captchaKey: captcha.value.key,
       captchaCode: form.value.captchaCode,
+      // 邀请人ID随注册一并提交，由后端建立双向好友并发放邀请积分
+      inviterId: inviterId.value ? Number(inviterId.value) : undefined,
     })
-    if (inviterId.value) {
-      try {
-        await shareRegister(Number(inviterId.value))
-      } catch {
-        // 邀请奖励失败不阻断注册
-      }
-    }
     uni.showToast({ title: '注册成功', icon: 'success' })
     setTimeout(() => {
       uni.reLaunch({ url: '/pages/login/login' })

@@ -1,8 +1,8 @@
 <template>
   <view class="study-page">
     <view class="player-box">
-      <video v-if="mediaType === 'video' && mediaSrc" :key="mediaSrc" class="player" :src="mediaSrc" :initial-time="playProgress" @timeupdate="onTimeUpdate" @ended="onVideoEnd" @play="startTimer" @pause="pauseTimer" controls></video>
-      <live-player v-if="mediaType === 'live'" class="player" :src="mediaSrc" @play="startTimer" @pause="pauseTimer" autoplay></live-player>
+      <video v-if="mediaType === 'video' && mediaSrc" :key="mediaSrc" class="player" :src="mediaSrc" :initial-time="playProgress" object-fit="contain" @timeupdate="onTimeUpdate" @ended="onVideoEnd" @error="onVideoError" @play="startTimer" @pause="pauseTimer" controls></video>
+      <live-player v-if="mediaType === 'live'" class="player" :src="mediaSrc" @play="startTimer" @pause="pauseTimer" @error="onVideoError" autoplay></live-player>
       <view v-if="mediaType === 'video' && !mediaSrc" class="player-empty">暂无视频</view>
       <view class="player-back" @click="goBack"><u-icon name="arrow-left" color="#fff" size="20"></u-icon></view>
       <view class="player-menu" @click="drawerShow = true"><u-icon name="list" color="#fff" size="20"></u-icon></view>
@@ -51,16 +51,30 @@
       <view v-if="bottomTab === 2" class="article"><rich-text :nodes="articleContent"></rich-text></view>
       <view v-if="bottomTab === 3" class="attach-list">
         <view class="attach-item video-attach" v-for="(video, index) in liveAttachmentVideos" :key="video.videoUrl || index">
-          <text class="a-name">{{ video.videoName || `视频${index + 1}` }}</text>
-          <text class="a-size" v-if="video.fileSize">{{ formatVideoSize(video.fileSize) }}</text>
-          <text class="a-size" v-else>视频</text>
+          <view class="a-icon-wrap a-icon-video">
+            <u-icon name="play-circle" color="#fff" size="18"></u-icon>
+          </view>
+          <view class="a-info">
+            <text class="a-name">{{ video.videoName || `视频${index + 1}` }}</text>
+            <text class="a-size">{{ video.fileSize ? formatFileSize(video.fileSize) : '视频文件' }}</text>
+          </view>
         </view>
-        <view class="attach-item" v-for="f in attachList" :key="f.id">
-          <text class="a-name">{{ f.fileName }}</text>
-          <text class="a-size">{{ f.fileSize }}</text>
-          <u-button type="primary" size="mini" @click="downloadFile(f)">下载</u-button>
+        <view class="attach-item" v-for="f in attachList" :key="f.id" @click="downloadFile(f)">
+          <view :class="['a-icon-wrap', getFileIconClass(f.fileName)]">
+            <u-icon :name="getFileIcon(f.fileName)" color="#fff" size="18"></u-icon>
+          </view>
+          <view class="a-info">
+            <text class="a-name">{{ f.fileName }}</text>
+            <text class="a-size">{{ formatFileSize(f.fileSize) }}</text>
+          </view>
+          <view class="a-download">
+            <u-icon name="download" color="#0195ff" size="20"></u-icon>
+          </view>
         </view>
-        <u-empty v-if="!attachList.length" text="暂无附件" mode="list" margin-top="30"></u-empty>
+        <view v-if="!attachList.length && !liveAttachmentVideos.length" class="attach-empty">
+          <u-icon name="folder" color="#c0c4cc" size="48"></u-icon>
+          <text class="attach-empty-text">暂无附件</text>
+        </view>
       </view>
     </view>
 
@@ -76,10 +90,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onUnload, onHide } from '@dcloudio/uni-app'
 import { getChapterDetail, getChapterList } from '../../api/course'
 import { saveStudyRecord, batchUploadStudy } from '../../api/study'
 import { StorageKey } from '../../utils/storage'
+import { BASE_URL } from '../../env'
 
 interface AttachItem { id: number; fileName: string; fileSize: string; fileUrl?: string }
 interface VideoItem { id?: number; videoName: string; videoUrl: string; fileSize?: number }
@@ -106,6 +121,7 @@ const playSecond = ref(0)
 const totalStudySecond = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
 let lastUploadTime = 0
+let lastTimeUpdate = 0
 
 const progressPercent = computed(() => {
   if (!totalStudySecond.value) return 0
@@ -119,7 +135,15 @@ onLoad((q: any) => {
   if (cid.value && currentChapterId.value) loadData()
 })
 
-onUnmounted(() => { pauseTimer(); flushOfflineQueue() })
+// 关键修复：页面关闭/卸载时必须清理计时器。
+// uni-app 页面生命周期中 onUnmounted 不一定触发，真正的页面销毁钩子是 onUnload；
+// 若只靠 onUnmounted 清理，setInterval 会在后台持续运行（多次进出叠加多个定时器），
+// 不断触发响应式重渲染与上报请求，最终拖垮 JS 线程 → 卡顿 / 卡退。
+// 同时 onHide 时暂停计时，避免切后台仍累计时长。
+function clearPlayTimer() { if (timer) { clearInterval(timer); timer = null } }
+onUnload(() => { clearPlayTimer(); flushOfflineQueue() })
+onHide(() => { pauseTimer() })
+onUnmounted(() => { clearPlayTimer(); flushOfflineQueue() })
 
 async function loadData() {
   // Load chapter detail
@@ -153,10 +177,21 @@ async function loadData() {
   } catch (e) { /* ignore parse errors */ }
 }
 
-function onTimeUpdate(e: any) { playSecond.value = Math.floor(e.detail.currentTime || 0) }
+function onTimeUpdate(e: any) {
+  const t = Math.floor(e.detail.currentTime || 0)
+  // 节流：timeupdate 约每秒触发 4 次，降低刷新频率避免频繁重渲染造成卡顿
+  const now = Date.now()
+  if (now - lastTimeUpdate >= 1000 || t === 0) {
+    lastTimeUpdate = now
+    playSecond.value = t
+  }
+}
+function onVideoError() {
+  uni.showToast({ title: '视频加载失败，请稍后重试', icon: 'none' })
+}
 function onVideoEnd() { pauseTimer(); uploadRecord() }
 function startTimer() { if (timer) return; timer = setInterval(() => { totalStudySecond.value++; const now = Date.now(); if (now - lastUploadTime > 15000) { lastUploadTime = now; uploadRecord() } }, 1000) }
-function pauseTimer() { if (timer) { clearInterval(timer); timer = null }; uploadRecord() }
+function pauseTimer() { clearPlayTimer(); uploadRecord() }
 
 async function uploadRecord() {
   const record = { courseId: cid.value, chapterId: currentChapterId.value, playSecond: playSecond.value, totalStudySecond: totalStudySecond.value }
@@ -187,6 +222,7 @@ function switchChapter(ch: { id: number; chapterName: string }) {
   mediaSrc.value = ''
   playSecond.value = 0; totalStudySecond.value = 0; playProgress.value = 0
   lastUploadTime = 0
+  lastTimeUpdate = 0
   timer = null
   loadData()
 }
@@ -200,6 +236,7 @@ function switchVideo(index: number) {
   playSecond.value = 0
   playProgress.value = 0
   lastUploadTime = 0
+  lastTimeUpdate = 0
 }
 
 function handleTabClick(idx: number) {
@@ -215,11 +252,73 @@ function sendChat() {
   chatMsgs.value.push({ id: Date.now(), userName: '我', content: chatInput.value })
   chatInput.value = ''
 }
-function downloadFile(f: AttachItem) { uni.showToast({ title: `下载 ${f.fileName}`, icon: 'none' }) }
+function downloadFile(f: AttachItem) {
+  if (!f.fileUrl) {
+    uni.showToast({ title: '文件地址不可用', icon: 'none' })
+    return
+  }
+  const downloadUrl = `${BASE_URL}/edu/upload/download?fileUrl=${encodeURIComponent(f.fileUrl)}&fileName=${encodeURIComponent(f.fileName)}`
+  // #ifdef H5
+  window.open(downloadUrl, '_blank')
+  // #endif
+  // #ifndef H5
+  uni.showLoading({ title: '下载中...', mask: true })
+  uni.downloadFile({
+    url: downloadUrl,
+    header: { Authorization: 'Bearer ' + (uni.getStorageSync('access_token') || '') },
+    success(res) {
+      uni.hideLoading()
+      if (res.statusCode === 200) {
+        uni.openDocument({ filePath: res.tempFilePath, showMenu: true })
+      } else {
+        uni.showToast({ title: '下载失败', icon: 'none' })
+      }
+    },
+    fail() {
+      uni.hideLoading()
+      uni.showToast({ title: '下载失败', icon: 'none' })
+    }
+  })
+  // #endif
+}
 function formatVideoSize(size?: number) {
   if (!size) return '视频'
   if (size < 1024 * 1024) return `${Math.round(size / 1024)}KB`
   return `${(size / 1024 / 1024).toFixed(1)}MB`
+}
+
+function formatFileSize(size: any): string {
+  const n = Number(size)
+  if (!n || isNaN(n)) return ''
+  if (n < 1024) return `${n}B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)}KB`
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)}MB`
+  return `${(n / 1024 / 1024 / 1024).toFixed(1)}GB`
+}
+
+function getFileIcon(name: string): string {
+  const ext = (name || '').split('.').pop()?.toLowerCase() || ''
+  if (['mp4', 'avi', 'mov', 'flv', 'wmv', 'mkv'].includes(ext)) return 'play-circle'
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) return 'image'
+  if (['mp3', 'wav', 'aac', 'flac'].includes(ext)) return 'music'
+  if (['zip', 'rar', '7z'].includes(ext)) return 'zip'
+  if (['doc', 'docx'].includes(ext)) return 'file-text'
+  if (['xls', 'xlsx'].includes(ext)) return 'list'
+  if (['ppt', 'pptx'].includes(ext)) return 'order'
+  if (ext === 'pdf') return 'file-text'
+  return 'file'
+}
+
+function getFileIconClass(name: string): string {
+  const ext = (name || '').split('.').pop()?.toLowerCase() || ''
+  if (['mp4', 'avi', 'mov', 'flv', 'wmv', 'mkv'].includes(ext)) return 'a-icon-video'
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) return 'a-icon-image'
+  if (['doc', 'docx'].includes(ext)) return 'a-icon-doc'
+  if (['xls', 'xlsx'].includes(ext)) return 'a-icon-excel'
+  if (['ppt', 'pptx'].includes(ext)) return 'a-icon-ppt'
+  if (ext === 'pdf') return 'a-icon-pdf'
+  if (['zip', 'rar', '7z'].includes(ext)) return 'a-icon-zip'
+  return 'a-icon-file'
 }
 </script>
 
@@ -248,9 +347,24 @@ function formatVideoSize(size?: number) {
 .msg-user { color: $primary; }
 .chat-input-bar { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
 .article { font-size: 14px; color: $text-2; line-height: 1.7; }
-.attach-item { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid $border; gap: 8px; }
-.a-name { flex: 1; font-size: 13px; color: $text-1; }
-.a-size { font-size: 11px; color: $text-3; }
+.attach-list { padding: 4px 0; }
+.attach-item { display: flex; align-items: center; padding: 14px 12px; margin: 0 0 8px; background: $bg-card; border-radius: 10px; gap: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+.attach-item:active { background: #f5f7fa; }
+.a-icon-wrap { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.a-icon-video { background: linear-gradient(135deg, #36d1dc, #5b86e5); }
+.a-icon-image { background: linear-gradient(135deg, #f093fb, #f5576c); }
+.a-icon-doc { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+.a-icon-excel { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+.a-icon-ppt { background: linear-gradient(135deg, #fa709a, #fee140); }
+.a-icon-pdf { background: linear-gradient(135deg, #f5576c, #ff6a88); }
+.a-icon-zip { background: linear-gradient(135deg, #a18cd1, #fbc2eb); }
+.a-icon-file { background: linear-gradient(135deg, #89f7fe, #66a6ff); }
+.a-info { flex: 1; min-width: 0; }
+.a-name { display: block; font-size: 14px; color: $text-1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a-size { display: block; font-size: 11px; color: $text-3; margin-top: 3px; }
+.a-download { width: 36px; height: 36px; border-radius: 50%; background: $primary-bg; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.attach-empty { display: flex; flex-direction: column; align-items: center; padding: 48px 0; }
+.attach-empty-text { font-size: 13px; color: $text-3; margin-top: 10px; }
 .mask { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99; }
 .drawer { position: fixed; left: 0; top: 0; bottom: 0; width: 72%; background: $bg-card; transform: translateX(-100%); transition: transform .25s; z-index: 100; padding-top: 44px; }
 .drawer.open { transform: translateX(0); }

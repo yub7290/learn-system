@@ -20,7 +20,7 @@ export interface CourseDetailVO {
     desc: string
     target: string
   }
-  chapter: Array<{ id: number; name: string }>
+  chapter: Array<{ id: number; name: string; children?: Array<{ id: number; name: string }> }>
   teacher: { avatar: string; name: string; intro: string }
   aiAssistant?: { enabled: boolean }
 }

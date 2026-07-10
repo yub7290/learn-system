@@ -26,12 +26,8 @@ export const useUserStore = defineStore('user', {
       this.accessToken = data.accessToken
       this.refreshToken = data.refreshToken
       setTokens(data.accessToken, data.refreshToken)
-      // 拉取用户信息失败不阻断登录:token 已有效,首页/onLaunch 会重试
-      try {
-        await this.fetchUserInfo()
-      } catch (e) {
-        // 忽略:登录本身已成功
-      }
+      // 拉取用户信息（失败时 requireAuth=true 会触发登录过期提示，不再静默忽略）
+      await this.fetchUserInfo()
     },
     async fetchUserInfo() {
       const info = await apiGetUserInfo()

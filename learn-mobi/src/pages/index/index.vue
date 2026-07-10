@@ -205,19 +205,46 @@ function getNavIcon(name: string): string {
 .nav-name { font-size: 12px; color: $text-2; margin-top: 6px; text-align: center; }
 
 /* ===== AI助教横幅 ===== */
-.quick-entry {
+.ai-banner {
   margin: 12px 14px 0;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-radius: $radius-card;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+}
+.ai-banner-left {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.qe-icon { font-size: 32px; color: rgba(255, 255, 255, 0.9); }
-.qe-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.qe-title { font-size: 14px; font-weight: 600; color: #fff; }
-.qe-desc { font-size: 11px; color: rgba(255, 255, 255, 0.75); }
+.ai-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ai-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ai-title { font-size: 15px; font-weight: 600; color: #fff; }
+.ai-desc { font-size: 11px; color: rgba(255, 255, 255, 0.75); }
+.ai-enter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 14px;
+  border-radius: 16px;
+}
+.ai-enter-text { font-size: 12px; color: #fff; font-weight: 500; }
 
 /* ===== 通用区块 ===== */
 .section { margin-top: 16px; padding: 0 14px; }

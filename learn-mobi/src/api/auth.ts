@@ -10,5 +10,10 @@ export function login(data: StudentLoginReqDTO): Promise<StudentLoginRespVO> {
 }
 
 export function getUserInfo(): Promise<StudentInfoRespVO> {
-  return http.get<StudentInfoRespVO>('/student/auth/getUserInfo')
+  return http.get<StudentInfoRespVO>('/student/auth/getUserInfo', undefined, undefined, { requireAuth: true })
+}
+
+/** 获取OAuth登录授权URL */
+export async function getOAuthLoginUrl(platform: string) {
+  return http.get<{ url: string }>('/student/auth/oauth/loginUrl', { platform }, null, { skipAuth: true })
 }

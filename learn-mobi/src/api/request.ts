@@ -26,6 +26,8 @@ export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   data?: any
   header?: Record<string, string>
+  /** 请求超时时间（毫秒），默认60000 */
+  timeout?: number
   /** 为 true 时即使有 token 也不带 Authorization(如刷新接口本身) */
   skipAuth?: boolean
   /** 为 true 时 401 才提示登录,默认允许页面自行展示空态 */
@@ -65,7 +67,7 @@ function doRefresh(): Promise<boolean> {
 
 /** 核心请求方法,返回 Promise<T>(T 为 Response.data) */
 export function request<T = any>(opts: RequestOptions): Promise<T> {
-  const { url, method = 'GET', data, header = {}, skipAuth = false, requireAuth = false, showError = true } = opts
+  const { url, method = 'GET', data, header = {}, timeout, skipAuth = false, requireAuth = false, showError = true } = opts
   const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`
 
   const finalHeader: Record<string, string> = { 'Content-Type': 'application/json', ...header }
@@ -80,6 +82,7 @@ export function request<T = any>(opts: RequestOptions): Promise<T> {
         method,
         data,
         header: finalHeader,
+        timeout: timeout || 60000,
         success: async (res: any) => {
           try {
             const r = res.data as Response<T>
@@ -154,42 +157,76 @@ export interface UploadOptions {
 export function uploadFile(opts: UploadOptions): Promise<string> {
   const { filePath, name = 'file', formData: extra = {} } = opts
   const fullUrl = `${BASE_URL}/edu/upload/image`
-  const header: Record<string, string> = {}
+  const authHeader: Record<string, string> = {}
   if (getAccessToken()) {
-    header['Authorization'] = `Bearer ${getAccessToken()}`
+    authHeader['Authorization'] = `Bearer ${getAccessToken()}`
   }
 
+  // H5模式：filePath是blob/data URL，用fetch+FormData上传
+  // #ifdef H5
+  return h5Upload(fullUrl, filePath, name, extra, authHeader)
+  // #endif
+  // #ifndef H5
+  return uniUpload(fullUrl, filePath, name, extra, authHeader)
+  // #endif
+}
+
+// #ifdef H5
+function h5Upload(url: string, filePath: string, name: string, extra: Record<string, string>, headers: Record<string, string>): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    fetch(filePath)
+      .then(res => res.blob())
+      .then(blob => {
+        const fd = new FormData()
+        fd.append(name, blob, 'upload.jpg')
+        Object.entries(extra).forEach(([k, v]) => fd.append(k, v))
+        const xhr = new XMLHttpRequest()
+        xhr.open('POST', url, true)
+        if (headers['Authorization']) xhr.setRequestHeader('Authorization', headers['Authorization'])
+        xhr.onload = () => {
+          try {
+            const r = JSON.parse(xhr.responseText) as Response<string>
+            if (r.code === 200 && r.data) resolve(r.data)
+            else reject(new Error(r.message || '上传失败'))
+          } catch { reject(new Error('上传响应格式异常')) }
+        }
+        xhr.onerror = () => reject(new Error('上传网络异常'))
+        xhr.send(fd)
+      })
+      .catch(() => reject(new Error('上传网络异常')))
+  })
+}
+// #endif
+
+// #ifndef H5
+function uniUpload(url: string, filePath: string, name: string, extra: Record<string, string>, headers: Record<string, string>): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     uni.uploadFile({
-      url: fullUrl,
+      url,
       filePath,
       name,
       formData: { ...extra },
-      header,
+      header: headers,
       success: (res) => {
         try {
           const r = JSON.parse(res.data) as Response<string>
-          if (r.code === 200 && r.data) {
-            resolve(r.data)
-          } else {
-            reject(new Error(r.message || '上传失败'))
-          }
-        } catch {
-          reject(new Error('上传响应格式异常'))
-        }
+          if (r.code === 200 && r.data) resolve(r.data)
+          else reject(new Error(r.message || '上传失败'))
+        } catch { reject(new Error('上传响应格式异常')) }
       },
       fail: () => reject(new Error('上传网络异常')),
     })
   })
 }
+// #endif
 
 export const http = {
-  get: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth'>) =>
+  get: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth' | 'timeout'>) =>
     request<T>({ url, method: 'GET', data, header, ...options }),
-  post: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth'>) =>
+  post: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth' | 'timeout'>) =>
     request<T>({ url, method: 'POST', data, header, ...options }),
-  put: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth'>) =>
+  put: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth' | 'timeout'>) =>
     request<T>({ url, method: 'PUT', data, header, ...options }),
-  delete: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth'>) =>
+  delete: <T = any>(url: string, data?: any, header?: Record<string, string>, options?: Pick<RequestOptions, 'requireAuth' | 'showError' | 'skipAuth' | 'timeout'>) =>
     request<T>({ url, method: 'DELETE', data, header, ...options }),
 }

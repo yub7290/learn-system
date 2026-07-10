@@ -117,7 +117,7 @@ import { getPersonalInfo, shareRecord, shareRegister } from '../../api/mine'
 import { sm3Hash } from '../../utils/sm3'
 import { http } from '../../api/request'
 import { useUserStore } from '../../stores/user'
-import { BASE_URL } from '../../env'
+import { H5_BASE_URL } from '../../env'
 import type { PersonalInfoVO } from '../../types/mine'
 
 const userInfo = ref<PersonalInfoVO>({
@@ -224,7 +224,7 @@ async function handleShare() {
     uni.showToast({ title: '请先登录', icon: 'none' })
     return
   }
-  const shareUrl = `${BASE_URL}/#/pages/register/register?inviter=${userId}`
+  const shareUrl = `${H5_BASE_URL}/#/pages/register/register?inviter=${userId}`
   uni.showActionSheet({
     itemList: ['分享给好友', '分享到朋友圈', '复制链接'],
     success: async (res) => {

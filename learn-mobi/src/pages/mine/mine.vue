@@ -144,17 +144,20 @@
 
       <!-- 系统设置 -->
       <view class="section-card">
-        <view class="menu-item" @click="goPage('notice')">
+        <view class="menu-item" @click="goNotice">
           <view class="menu-left">
             <view class="menu-icon-wrap icon-blue">
               <u-icon name="bell" color="#0195ff" size="18"></u-icon>
             </view>
             <text class="menu-text">通知</text>
           </view>
-          <u-icon name="arrow-right" color="#c0c4cc" size="14"></u-icon>
+          <view class="menu-right">
+            <view class="menu-badge" v-if="noticeUnread > 0">{{ noticeUnread > 99 ? '99+' : noticeUnread }}</view>
+            <u-icon name="arrow-right" color="#c0c4cc" size="14"></u-icon>
+          </view>
         </view>
         <view class="menu-divider"></view>
-        <view class="menu-item" @click="goPage('news')">
+        <view class="menu-item" @click="goNews">
           <view class="menu-left">
             <view class="menu-icon-wrap icon-green">
               <u-icon name="eye" color="#07c160" size="18"></u-icon>
@@ -164,7 +167,7 @@
           <u-icon name="arrow-right" color="#c0c4cc" size="14"></u-icon>
         </view>
         <view class="menu-divider"></view>
-        <view class="menu-item" @click="handleClearCache">
+        <view class="menu-item" @click="goCache">
           <view class="menu-left">
             <view class="menu-icon-wrap icon-gray">
               <u-icon name="reload" color="#999" size="18"></u-icon>
@@ -197,6 +200,7 @@ import TabBar from '../../components/TabBar.vue'
 import { useUserStore } from '../../stores/user'
 import { getStudyStats } from '../../api/study'
 import { getPointsAccount } from '../../api/mine'
+import { getNoticeUnread } from '../../api/notice'
 import { requireLogin } from '../../utils/auth'
 import type { StudyStatsVO } from '../../types/study'
 
@@ -209,6 +213,7 @@ const stats = ref<StudyStatsVO & { points?: number }>({
   points: 0,
 })
 const cacheSize = ref('0M')
+const noticeUnread = ref(0)
 
 onShow(async () => {
   if (userStore.isLoggedIn) {
@@ -241,7 +246,20 @@ onShow(async () => {
     }
   }
   getCacheSize()
+  fetchNoticeUnread()
 })
+
+function fetchNoticeUnread() {
+  if (!userStore.isLoggedIn) {
+    noticeUnread.value = 0
+    return
+  }
+  getNoticeUnread()
+    .then((res) => {
+      noticeUnread.value = res.count || 0
+    })
+    .catch(() => {})
+}
 
 function getCacheSize() {
   try {
@@ -272,6 +290,9 @@ function goPage(pageKey: string) {
     studyRecord: '/pages/mine/study-record',
     favorite: '/pages/practice/favorite',
     note: '/pages/practice/note',
+    fund: '/pages/mine/fund',
+    bindAccount: '/pages/mine/bind-account',
+    friends: '/pages/mine/friend-list',
   }
   const url = pageMap[pageKey]
   if (url) {
@@ -281,18 +302,18 @@ function goPage(pageKey: string) {
   }
 }
 
-function handleClearCache() {
-  uni.showModal({
-    title: '提示',
-    content: '确定要清除本地缓存吗？',
-    success: (res) => {
-      if (res.confirm) {
-        uni.clearStorageSync()
-        cacheSize.value = '0M'
-        uni.showToast({ title: '缓存已清除', icon: 'success' })
-      }
-    },
-  })
+function goNotice() {
+  if (!requireLogin('登录后才能查看通知')) return
+  uni.navigateTo({ url: '/pages/mine/notice' }).catch(() => {})
+}
+
+function goNews() {
+  if (!requireLogin('登录后才能查看资讯')) return
+  uni.navigateTo({ url: '/pages/mine/news' }).catch(() => {})
+}
+
+function goCache() {
+  uni.navigateTo({ url: '/pages/mine/cache' }).catch(() => {})
 }
 
 function handleLogout() {
@@ -491,6 +512,19 @@ function handleLogout() {
 .cache-text {
   font-size: 12px;
   color: $text-3;
+}
+
+.menu-badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: $danger;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  margin-right: 6px;
 }
 
 /* 分割线 */

@@ -41,11 +41,26 @@
       </view>
       <view v-if="tabIndex === 1" class="tab-panel">
         <view class="chapter-list">
-          <view class="chapter-item" v-for="(ch, i) in info.chapter" :key="ch.id" @click="openStudy(ch.id)">
-            <view class="ch-idx">{{ i + 1 }}</view>
-            <text class="ch-name">{{ ch.name }}</text>
-            <view class="ch-btn">学习</view>
-          </view>
+          <template v-for="ch in info.chapter" :key="ch.id">
+            <!-- 父章节（有children） -->
+            <view v-if="ch.children && ch.children.length" class="chapter-parent" @click.stop="toggleChapter(ch.id)">
+              <u-icon :name="expandedIds.has(ch.id) ? 'arrow-down' : 'arrow-right'" color="#999" size="14"></u-icon>
+              <text class="chapter-parent-name">{{ ch.name }}</text>
+              <text class="chapter-count">{{ ch.children.length }}节</text>
+            </view>
+            <!-- 有children时渲染子章节 -->
+            <template v-if="expandedIds.has(ch.id) && ch.children">
+              <view class="chapter-child" v-for="sub in ch.children" :key="sub.id" @click="openStudy(sub.id)">
+                <text class="chapter-child-name">{{ sub.name }}</text>
+                <view class="ch-btn">学习</view>
+              </view>
+            </template>
+            <!-- 无children直接渲染（兜底） -->
+            <view v-else-if="!ch.children || !ch.children.length" class="chapter-item" @click="openStudy(ch.id)">
+              <text class="ch-name">{{ ch.name }}</text>
+              <view class="ch-btn">学习</view>
+            </view>
+          </template>
           <u-empty v-if="!info.chapter.length" text="暂无章节" mode="list" margin-top="30"></u-empty>
         </view>
       </view>
@@ -74,6 +89,7 @@ import type { CourseDetailVO } from '../../types/course'
 
 const cid = ref(0)
 const tabIndex = ref(1)  // 默认选中章节 tab
+const expandedIds = ref(new Set<number>())
 const tabList = [{ name: '课程介绍' }, { name: '章节' }, { name: '学习目标' }, { name: '讲师' }]
 const info = ref<CourseDetailVO>({
   course: { title: '', bannerImg: '', viewNum: 0, freeFlag: false, desc: '', target: '' },
@@ -96,6 +112,12 @@ async function loadDetail() {
   try { info.value = await getCourseDetail(cid.value) } catch (e) { uni.showToast({ title: '课程加载失败', icon: 'none' }) }
 }
 function goBack() { uni.navigateBack().catch(() => uni.reLaunch({ url: '/pages/course/course' })) }
+
+function toggleChapter(id: number) {
+  const s = new Set(expandedIds.value)
+  s.has(id) ? s.delete(id) : s.add(id)
+  expandedIds.value = s
+}
 
 /** 开始学习：跳转到第一章 */
 function startLearning() {
@@ -203,6 +225,11 @@ async function handleFinalExam() {
 .ch-idx { width: 22px; height: 22px; border-radius: 50%; background: $primary-bg; color: $primary; font-size: 11px; display: flex; align-items: center; justify-content: center; }
 .ch-name { flex: 1; margin-left: 10px; font-size: 13px; color: $text-1; }
 .ch-btn { font-size: 11px; color: $bg-card; background: linear-gradient(135deg,$primary,$primary-light); padding: 4px 12px; border-radius: 12px; }
+.chapter-parent { display: flex; align-items: center; padding: 11px 0; border-bottom: 1px solid $border; gap: 8px; }
+.chapter-parent-name { flex: 1; font-size: 13px; font-weight: 600; color: $text-1; }
+.chapter-count { font-size: 11px; color: $text-3; }
+.chapter-child { display: flex; align-items: center; padding: 9px 0 9px 22px; border-bottom: 1px solid $border; }
+.chapter-child-name { flex: 1; font-size: 13px; color: $text-2; }
 .teacher-content { text-align: center; padding: 10px 0; }
 .t-avatar { width: 64px; height: 64px; border-radius: 50%; }
 .t-avatar.ph { width: 64px; height: 64px; border-radius: 50%; background: #d6dde6; }

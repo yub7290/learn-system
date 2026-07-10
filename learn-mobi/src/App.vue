@@ -7,7 +7,9 @@ const userStore = useUserStore()
 onLaunch(() => {
   // 若本地有 token,尝试恢复用户信息(失败由 request 层 401 处理)
   if (userStore.isLoggedIn) {
-    userStore.fetchUserInfo().catch(() => {})
+    userStore.fetchUserInfo().catch((e) => {
+      console.warn('[App] 恢复用户信息失败:', e?.message || e)
+    })
   }
 })
 </script>

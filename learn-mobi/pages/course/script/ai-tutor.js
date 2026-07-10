@@ -1,6 +1,6 @@
-import { request, getToken } from '../../../utils/request.js'
-
-const BASE_URL = 'http://localhost:8001/api'
+import { request } from '../../../api/request'
+import { getAccessToken } from '../../../utils/auth'
+import { BASE_URL } from '../../../env'
 
 export default {
   data() {
@@ -200,7 +200,7 @@ export default {
       this.isLoading = true
 
       try {
-        const res = await request({
+        const list = await request({
           url: '/student/ai/history',
           method: 'GET',
           data: {
@@ -209,11 +209,8 @@ export default {
           }
         })
 
-        if (res.statusCode === 200 && res.data.code === 200) {
-          const list = res.data.data || []
-          this.messages = list.reverse()
-          this.scrollToBottom()
-        }
+        this.messages = (list || []).reverse()
+        this.scrollToBottom()
       } catch (e) {
         console.error('加载历史消息失败', e)
       } finally {
@@ -228,7 +225,7 @@ export default {
       this.page++
 
       try {
-        const res = await request({
+        const list = await request({
           url: '/student/ai/history',
           method: 'GET',
           data: {
@@ -239,13 +236,11 @@ export default {
           }
         })
 
-        if (res.statusCode === 200 && res.data.code === 200) {
-          const list = res.data.data || []
-          if (list.length < 50) {
-            this.hasMore = false
-          }
-          this.messages = [...list.reverse(), ...this.messages]
+        const arr = list || []
+        if (arr.length < 50) {
+          this.hasMore = false
         }
+        this.messages = [...arr.reverse(), ...this.messages]
       } catch (e) {
         console.error('加载更多消息失败', e)
         this.page--
@@ -302,7 +297,7 @@ export default {
       this._streamAbort = controller
 
       try {
-        const token = getToken()
+        const token = getAccessToken()
         const response = await fetch(`${BASE_URL}/student/ai/chat/stream`, {
           method: 'POST',
           headers: {

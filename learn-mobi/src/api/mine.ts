@@ -8,6 +8,10 @@ import type {
   PointsProductVO,
   PersonalInfoVO,
   ExchangeResultVO,
+  OAuthBindStatusVO,
+  FundSummaryVO,
+  FundTransactionVO,
+  CourseOrderVO,
 } from '../types/mine'
 import { isLoggedIn } from '../utils/auth'
 import { http, uploadFile } from './request'
@@ -201,6 +205,8 @@ export function register(data: {
   password: string
   captchaKey: string
   captchaCode: string
+  /** 邀请人ID（通过邀请链接注册时携带） */
+  inviterId?: number
 }): Promise<void> {
   return http.post<void>('/student/auth/register', data, undefined, { skipAuth: true })
 }
@@ -217,4 +223,85 @@ export function shareRecord(): Promise<void> {
  */
 export function shareRegister(inviterId: number): Promise<void> {
   return http.post<void>('/app/share/register', { inviterId })
+}
+
+/** 获取OAuth绑定授权URL */
+export async function getOAuthBindUrl(platform: string) {
+  if (!isLoggedIn()) return { url: '' }
+  return http.get<{ url: string }>('/app/oauth/bindUrl', { platform })
+}
+
+/** 获取所有平台绑定状态 */
+export async function getOAuthBindStatus() {
+  if (!isLoggedIn()) return { wechat: { bound: false }, qq: { bound: false } } as OAuthBindStatusVO
+  return http.get<OAuthBindStatusVO>('/app/oauth/status')
+}
+
+/** 解绑第三方账号 */
+export async function unbindOAuth(platform: string) {
+  return http.delete<void>('/app/oauth/unbind', { platform })
+}
+
+/**
+ * 获取资金余额概览
+ */
+export function getFundSummary(): Promise<FundSummaryVO> {
+  if (!isLoggedIn()) return Promise.resolve({ balance: 0, totalRecharge: 0, totalConsumption: 0 })
+  return http.get<FundSummaryVO>('/app/fund/summary')
+}
+
+/**
+ * 获取资金交易记录（分页）
+ */
+export function getFundTransactions(params: {
+  transactionType?: string
+  page: number
+  pageSize: number
+}): Promise<{ list: FundTransactionVO[]; total: number }> {
+  if (!isLoggedIn()) return Promise.resolve({ list: [], total: 0 })
+  return http
+    .post<{ records: FundTransactionVO[]; total: number }>(
+      '/app/fund/transactions',
+      {},
+      { params: { transactionType: params.transactionType || '', pageNum: params.page, pageSize: params.pageSize } }
+    )
+    .then((res) => ({ list: res.records || [], total: res.total || 0 }))
+}
+
+/**
+ * 创建充值订单
+ */
+export function createRechargeOrder(amount: number): Promise<{ success: boolean; payUrl?: string }> {
+  return http.post<{ success: boolean; payUrl?: string }>('/app/fund/recharge', { amount })
+}
+
+/**
+ * 查询充值结果
+ */
+export function getRechargeResult(orderNo: string): Promise<{ status: number; orderNo: string }> {
+  return http.get<{ status: number; orderNo: string }>(`/app/fund/recharge/${orderNo}/result`)
+}
+
+/**
+ * 创建课程购买订单
+ */
+export function createCourseOrder(courseId: number, paymentMethod: string): Promise<CourseOrderVO> {
+  return http.post<CourseOrderVO>('/app/course-order/purchase', { courseId, paymentMethod })
+}
+
+/**
+ * 获取我的课程订单列表（分页）
+ */
+export function getMyCourseOrders(params: {
+  page: number
+  pageSize: number
+}): Promise<{ list: CourseOrderVO[]; total: number }> {
+  if (!isLoggedIn()) return Promise.resolve({ list: [], total: 0 })
+  return http
+    .post<{ records: CourseOrderVO[]; total: number }>(
+      '/app/course-order/my',
+      {},
+      { params: { pageNum: params.page, pageSize: params.pageSize } }
+    )
+    .then((res) => ({ list: res.records || [], total: res.total || 0 }))
 }

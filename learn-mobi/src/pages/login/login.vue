@@ -41,12 +41,35 @@
         <text class="link">注册账号</text>
       </view>
     </view>
+
+    <!-- 第三方登录 -->
+    <view class="third-party">
+      <view class="divider">
+        <view class="line"></view>
+        <text class="text">其他登录方式</text>
+        <view class="line"></view>
+      </view>
+      <view class="social-icons">
+        <view class="social-item" @click="oauthLogin('wechat')">
+          <view class="social-icon wechat">
+            <u-icon name="weixin-circle-fill" color="#07c160" size="32"></u-icon>
+          </view>
+          <text class="social-name">微信</text>
+        </view>
+        <view class="social-item" @click="oauthLogin('qq')">
+          <view class="social-icon qq">
+            <u-icon name="qq-circle-fill" color="#12b7f5" size="32"></u-icon>
+          </view>
+          <text class="social-name">QQ</text>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getCaptcha } from '../../api/auth'
+import { getCaptcha, getOAuthLoginUrl } from '../../api/auth'
 import { sm3Hash } from '../../utils/sm3'
 import { useUserStore } from '../../stores/user'
 
@@ -85,6 +108,17 @@ async function doLogin() {
     loadCaptcha() // 验证码失效,刷新
   } finally {
     loading.value = false
+  }
+}
+
+async function oauthLogin(platform: string) {
+  try {
+    const res = await getOAuthLoginUrl(platform)
+    if (res.url) {
+      window.location.href = res.url
+    }
+  } catch (e) {
+    // toast handled by request layer
   }
 }
 
@@ -136,4 +170,23 @@ function closeLogin() {
 .captcha-img.placeholder { width: 120px; height: 48px; background: $primary-bg; color: $primary; font-size: 13px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
 .links { display: flex; justify-content: space-between; font-size: 12px; color: $text-3; margin-top: 12px; }
 .link { color: $primary; }
+.third-party { margin-top: 36px; }
+.divider {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
+  .line { flex: 1; height: 1px; background: $border; }
+  .text { font-size: 12px; color: $text-3; white-space: nowrap; }
+}
+.social-icons {
+  display: flex; justify-content: center; gap: 40px;
+}
+.social-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.social-icon {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  &.wechat { background: rgba(7,193,96,0.1); }
+  &.qq { background: rgba(18,183,245,0.1); }
+}
+.social-name { font-size: 11px; color: $text-3; }
 </style>

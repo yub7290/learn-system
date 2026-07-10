@@ -161,3 +161,67 @@ export interface ExchangeResultVO {
   /** 订单编号(邮寄) */
   orderNo?: string
 }
+
+/** OAuth绑定状态 */
+export interface OAuthBindStatusItem {
+  bound: boolean
+  nickname?: string
+  avatarUrl?: string
+  bindTime?: string
+}
+
+/** OAuth绑定状态响应 */
+export interface OAuthBindStatusVO {
+  wechat: OAuthBindStatusItem
+  qq: OAuthBindStatusItem
+}
+
+/** 资金余额概览 */
+export interface FundSummaryVO {
+  balance: number
+  totalRecharge: number
+  totalConsumption: number
+}
+
+/** 资金交易记录 */
+export interface FundTransactionVO {
+  id: number
+  transactionType: 'RECHARGE' | 'COURSE_PURCHASE' | 'REFUND'
+  amount: number
+  balanceAfter: number
+  description: string
+  createTime: string
+}
+
+/** 课程订单 */
+export interface CourseOrderVO {
+  orderNo: string
+  courseId: number
+  courseName: string
+  amount: number
+  paymentMethod: string
+  status: number
+  paidAt: string
+}
+
+/** 好友信息 */
+export interface FriendVO {
+  /** 关系记录ID */
+  id: number
+  /** 好友学员ID */
+  friendId: number
+  /** 姓名 */
+  name?: string
+  /** 昵称 */
+  nickName?: string
+  /** 头像地址 */
+  avatarUrl?: string
+  /** 学员编号 */
+  studentNo?: string
+  /** 学校 */
+  school?: string
+  /** 好友最后登录时间 */
+  lastLoginTime?: string
+  /** 成为好友时间 */
+  createTime?: string
+}
