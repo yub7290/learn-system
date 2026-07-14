@@ -104,6 +104,7 @@ const funcList = [
   { name: '课程公告', icon: 'bell' },
   { name: 'AI助教', icon: 'chat', iconfont: 'icon-ai64' },
   { name: '综合成绩', icon: 'star' },
+  { name: '批改记录', icon: 'checkmark-circle' },
 ]
 
 onLoad((q: any) => { cid.value = Number(q.cid) || 0; if (cid.value) loadDetail() })
@@ -174,6 +175,13 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
   if (f.name === '综合成绩') {
     if (!requireLogin('登录后才能查看综合成绩')) return
     uni.navigateTo({ url: `/pages/course/comprehensive-score?courseId=${cid.value}` }).catch(() => {})
+    return
+  }
+  if (f.name === '批改记录') {
+    if (!requireLogin('登录后才能查看批改记录')) return
+    uni.navigateTo({
+      url: `/pages/ai/homework-list?courseId=${cid.value}&courseName=${encodeURIComponent(info.value.course.title)}`,
+    }).catch(() => {})
     return
   }
   uni.showToast({ title: `${f.name}功能即将上线`, icon: 'none' })

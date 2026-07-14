@@ -14,6 +14,9 @@
           <view class="nav-btn" @click="goHistory">
             <u-icon name="clock" color="#666" size="20"></u-icon>
           </view>
+          <view v-if="currentCourseId" class="nav-btn" @click="goHomework">
+            <u-icon name="checkmark-circle" color="#0195ff" size="20"></u-icon>
+          </view>
           <view class="nav-btn" @click="newConversation">
             <u-icon name="plus" color="#666" size="20"></u-icon>
           </view>
@@ -448,7 +451,13 @@ function newConversation() {
 
 function goHistory() {
   if (messageList.value.length > 1) saveToLocal()
-  uni.navigateTo({ url: '/pages/ai/homework-list' })
+  uni.navigateTo({ url: '/pages/ai/history' }).catch(() => {})
+}
+
+function goHomework() {
+  if (messageList.value.length > 1) saveToLocal()
+  if (!currentCourseId.value) return
+  uni.navigateTo({ url: `/pages/ai/homework-list?courseId=${currentCourseId.value}` }).catch(() => {})
 }
 
 function goBack() {

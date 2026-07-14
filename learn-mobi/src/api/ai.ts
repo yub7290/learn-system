@@ -72,10 +72,13 @@ export function submitHomework(data: HomeworkSubmitDTO): Promise<HomeworkCorrect
   return http.post<HomeworkCorrectionVO>('/student/homework/submit', data, undefined, { timeout: 180000 })
 }
 
-export function getHomeworkList(courseId?: number, pageNum?: number, pageSize?: number): Promise<PageResult<HomeworkPageVO>> {
-  return http.get<PageResult<HomeworkPageVO>>('/ai/homework/list', { courseId, pageNum, pageSize })
+export function getHomeworkList(courseId: number, pageNum = 1, pageSize = 10, options?: { timeout?: number; showError?: boolean }): Promise<PageResult<HomeworkPageVO>> {
+  return http.post<PageResult<HomeworkPageVO>>('/student/homework/list', {
+    queryParam: { courseId },
+    pageParam: { pageNum, pageSize },
+  }, undefined, options)
 }
 
-export function getHomeworkDetail(id: number): Promise<HomeworkCorrectionVO> {
-  return http.get<HomeworkCorrectionVO>(`/ai/homework/detail/${id}`)
+export function getHomeworkDetail(id: number, options?: { timeout?: number; showError?: boolean }): Promise<HomeworkCorrectionVO> {
+  return http.get<HomeworkCorrectionVO>(`/student/homework/detail/${id}`, undefined, undefined, options)
 }

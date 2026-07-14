@@ -34,3 +34,5 @@ docs/superpowers
 reasonix.toml.vscode/
 reasonix.toml
 /AGENTS.md
+.workbuddy
+.tmp
