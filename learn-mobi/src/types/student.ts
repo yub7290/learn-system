@@ -194,11 +194,20 @@ export interface SubjectItemVO {
 
 /** 学科图谱数据 */
 export interface SubjectGraphVO {
+  allNodes: KnowledgeNodeDetailVO[]
+  relations: KnowledgeRelationVO[]
   preNodes: KnowledgeNodeDetailVO[]
   coreNode: KnowledgeNodeDetailVO
   nextNodes: KnowledgeNodeDetailVO[]
   goodChain: string
   weakChain: string
+}
+
+/** 知识关系 */
+export interface KnowledgeRelationVO {
+  sourceId: number
+  targetId: number
+  relationType: number
 }
 
 /** 图谱节点位置 */

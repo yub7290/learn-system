@@ -119,6 +119,24 @@ export function getSubjectGraph(subject: string): Promise<SubjectGraphVO> {
   return http.get<SubjectGraphVO>('/student/growth/subject-graph', { subject })
 }
 
+export function getKnowledgeCategories(): Promise<SubjectItemVO[]> {
+  if (!isLoggedIn()) return Promise.resolve([])
+  return http.get<SubjectItemVO[]>('/student/growth/categories')
+}
+
+export function getCategoryGraph(categoryId: string): Promise<SubjectGraphVO> {
+  if (!isLoggedIn()) {
+    return Promise.resolve({
+      preNodes: [],
+      coreNode: { id: 0, name: '', mastery: 0, type: 'core', questionTypes: [] },
+      nextNodes: [],
+      goodChain: '',
+      weakChain: '',
+    })
+  }
+  return http.get<SubjectGraphVO>('/student/growth/category-graph', { categoryId })
+}
+
 export function getWeekPlanDetail(weekIndex?: number): Promise<WeekPlanDetailVO> {
   if (!isLoggedIn()) return Promise.resolve(emptyWeekPlanDetail)
   return http.get<WeekPlanDetailVO>('/student/growth/week-plan', { weekIndex })

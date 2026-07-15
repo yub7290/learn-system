@@ -86,20 +86,20 @@
       </view>
 
       <!-- 知识图谱 -->
-      <view class="section-card">
+    <view class="section-card">
         <view class="card-header">
           <text class="card-title">知识关联拓扑图谱</text>
-          <text class="card-sub">{{ subjectList.length ? '点击学科切换' : '全量知识点' }}</text>
+          <text class="card-sub">{{ categoryList.length ? '点击分类切换' : '暂无分类数据' }}</text>
         </view>
 
-        <scroll-view v-if="subjectList.length" scroll-x class="tabs-scroll" show-scrollbar="false">
+        <scroll-view v-if="categoryList.length" scroll-x class="tabs-scroll" show-scrollbar="false">
           <view class="subject-tabs">
             <view
               class="tab-item"
-              :class="{ active: currentSubject === item.key }"
-              v-for="item in subjectList"
+              :class="{ active: currentCategory === item.key }"
+              v-for="item in categoryList"
               :key="item.key"
-              @click="switchSubject(item.key)"
+              @click="switchCategory(item.key)"
             >
               <text>{{ item.name }}</text>
             </view>
@@ -111,6 +111,8 @@
             :pre-nodes="graphPreNodes"
             :core-node="graphCoreNode"
             :next-nodes="graphNextNodes"
+            :all-nodes="graphAllNodes"
+            :relations="graphRelations"
             :width="650"
             :height="320"
           />
@@ -209,14 +211,14 @@ import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import RadarChart from '../../components/RadarChart.vue'
 import KnowledgeGraph from '../../components/KnowledgeGraph.vue'
-import { getWeekReportList, getSubjectList, getSubjectGraph } from '../../api/student'
+import { getWeekReportList, getKnowledgeCategories, getCategoryGraph } from '../../api/student'
 import type { WeekReportVO, AbilityScoreVO, DurationItemVO, SubjectItemVO, SubjectGraphVO, GraphNodeVO } from '../../types/student'
 
 const currentWeekIndex = ref(0)
 const showWeekPicker = ref(false)
-const currentSubject = ref('')
+const currentCategory = ref('')
 const weekReportList = ref<WeekReportVO[]>([])
-const subjectList = ref<SubjectItemVO[]>([])
+const categoryList = ref<SubjectItemVO[]>([])
 const emptyReport: WeekReportVO = {
   weekName: '',
   totalScore: 0,
@@ -276,19 +278,30 @@ const graphNextNodes = computed<GraphNodeVO[]>(() => {
   return currentGraph.value.nextNodes.map((n) => ({ id: n.id, name: n.name, mastery: n.mastery }))
 })
 
+const graphAllNodes = computed<GraphNodeVO[]>(() => {
+  if (currentGraph.value.allNodes && currentGraph.value.allNodes.length > 0) {
+    return currentGraph.value.allNodes.map((n) => ({ id: n.id, name: n.name, mastery: n.mastery }))
+  }
+  return []
+})
+
+const graphRelations = computed(() => {
+  return currentGraph.value.relations || []
+})
+
 const hasGraphData = computed(() => {
-  return !!currentGraph.value.coreNode.name || graphPreNodes.value.length > 0 || graphNextNodes.value.length > 0
+  return graphAllNodes.value.length > 0 || !!currentGraph.value.coreNode.name || graphPreNodes.value.length > 0 || graphNextNodes.value.length > 0
 })
 
 onShow(async () => {
   weekReportList.value = await getWeekReportList()
-  subjectList.value = await getSubjectList()
-  currentSubject.value = subjectList.value[0]?.key || ''
+  categoryList.value = await getKnowledgeCategories()
+  currentCategory.value = categoryList.value[0]?.key || ''
   await loadGraph()
 })
 
 async function loadGraph(): Promise<void> {
-  currentGraph.value = await getSubjectGraph(currentSubject.value)
+  currentGraph.value = await getCategoryGraph(currentCategory.value)
 }
 
 function prevWeek(): void {
@@ -306,8 +319,8 @@ function selectWeek(index: number): void {
   showWeekPicker.value = false
 }
 
-async function switchSubject(key: string): Promise<void> {
-  currentSubject.value = key
+async function switchCategory(key: string): Promise<void> {
+  currentCategory.value = key
   await loadGraph()
 }
 
