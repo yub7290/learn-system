@@ -108,31 +108,188 @@ function getMasteryFill(mastery: number): string {
   return 'rgba(245,108,108,0.15)'
 }
 
+function calculateNodeDegrees(nodes: GraphNode[], relations: KnowledgeRelation[]): Map<number, number> {
+  const degrees = new Map<number, number>()
+  nodes.forEach(node => degrees.set(node.id, 0))
+  relations.forEach(r => {
+    if (degrees.has(r.sourceId)) degrees.set(r.sourceId, (degrees.get(r.sourceId) || 0) + 1)
+    if (degrees.has(r.targetId)) degrees.set(r.targetId, (degrees.get(r.targetId) || 0) + 1)
+  })
+  return degrees
+}
+
+function findCentralNode(nodes: GraphNode[], degrees: Map<number, number>): number | null {
+  let centralId: number | null = null
+  let maxDegree = -1
+  nodes.forEach(node => {
+    const degree = degrees.get(node.id) || 0
+    if (degree > maxDegree) {
+      maxDegree = degree
+      centralId = node.id
+    }
+  })
+  return centralId
+}
+
 function layoutNodes(nodes: GraphNode[]): Map<number, { x: number; y: number }> {
   const layout = new Map<number, { x: number; y: number }>()
   const count = nodes.length
   
-  if (count <= 3) {
-    const colX = [120, canvasWidth.value / 2, canvasWidth.value - 120]
-    nodes.forEach((node, i) => {
-      layout.set(node.id, { x: colX[i], y: canvasHeight.value / 2 })
+  if (count === 0) return layout
+  
+  if (count === 1) {
+    layout.set(nodes[0].id, { x: canvasWidth.value / 2, y: canvasHeight.value / 2 })
+    return layout
+  }
+
+  const relations = props.relations || []
+  const degrees = calculateNodeDegrees(nodes, relations)
+  const centralId = relations.length > 0 ? findCentralNode(nodes, degrees) : null
+  const centerX = canvasWidth.value / 2
+  const centerY = canvasHeight.value / 2
+
+  if (centralId) {
+    layout.set(centralId, { x: centerX, y: centerY })
+  }
+
+  const nonCentralNodes = nodes.filter(n => n.id !== centralId)
+  const nodePositions = new Map<number, { x: number; y: number }>()
+  if (centralId) nodePositions.set(centralId, { x: centerX, y: centerY })
+
+  const layers = buildLayers(nodes, relations, centralId)
+  
+  let layerIndex = 1
+  layers.forEach((layerNodes) => {
+    let radius = 80 + layerIndex * 60
+    const layerCount = layerNodes.length
+    if (layerCount === 0) {
+      layerIndex++
+      return
+    }
+
+    const angleStep = (Math.PI * 2) / layerCount
+    layerNodes.forEach((nodeId, idx) => {
+      const node = nodes.find(n => n.id === nodeId)
+      if (!node) return
+
+      let angle = idx * angleStep - Math.PI / 2
+      let x = centerX + radius * Math.cos(angle)
+      let y = centerY + radius * Math.sin(angle)
+
+      while (checkCollision(x, y, nodePositions, 60)) {
+        radius += 8
+        x = centerX + radius * Math.cos(angle)
+        y = centerY + radius * Math.sin(angle)
+      }
+
+      layout.set(nodeId, { x, y })
+      nodePositions.set(nodeId, { x, y })
     })
-  } else {
-    const rows = Math.ceil(Math.sqrt(count))
-    const cols = Math.ceil(count / rows)
-    const spacingX = (canvasWidth.value - 160) / (cols - 1)
-    const spacingY = (canvasHeight.value - 120) / (rows - 1)
-    
-    nodes.forEach((node, i) => {
-      const row = Math.floor(i / cols)
-      const col = i % cols
-      const x = 80 + col * spacingX
-      const y = 60 + row * spacingY
+    layerIndex++
+  })
+
+  if (nonCentralNodes.length > 0 && layers.length === 0) {
+    const radius = 100
+    const angleStep = (Math.PI * 2) / nonCentralNodes.length
+    nonCentralNodes.forEach((node, idx) => {
+      const angle = idx * angleStep - Math.PI / 2
+      const x = centerX + radius * Math.cos(angle)
+      const y = centerY + radius * Math.sin(angle)
       layout.set(node.id, { x, y })
     })
   }
-  
+
+  const nodeArray = Array.from(layout.entries()).map(([id, pos]) => ({ id, ...pos }))
+  const adjustedLayout = applyCollisionAvoidance(nodeArray, 60)
+  adjustedLayout.forEach(node => {
+    layout.set(node.id, { x: node.x, y: node.y })
+  })
+
   return layout
+}
+
+function buildLayers(nodes: GraphNode[], relations: KnowledgeRelation[], centralId: number | null): number[][] {
+  if (!centralId) return []
+  
+  const layers: number[][] = []
+  const visited = new Set<number>([centralId])
+  let currentLayer: number[] = [centralId]
+
+  while (currentLayer.length > 0) {
+    const nextLayer = new Set<number>()
+    currentLayer.forEach(nodeId => {
+      relations.forEach(r => {
+        if (r.sourceId === nodeId && !visited.has(r.targetId)) {
+          nextLayer.add(r.targetId)
+        }
+        if (r.targetId === nodeId && !visited.has(r.sourceId)) {
+          nextLayer.add(r.sourceId)
+        }
+      })
+    })
+    const nextLayerArray = Array.from(nextLayer).filter(id => 
+      nodes.some(n => n.id === id)
+    )
+    if (nextLayerArray.length > 0) {
+      layers.push(nextLayerArray)
+      nextLayer.forEach(id => visited.add(id))
+    }
+    currentLayer = nextLayerArray
+  }
+
+  return layers
+}
+
+function checkCollision(x: number, y: number, positions: Map<number, { x: number; y: number }>, minDistance: number): boolean {
+  for (const [, pos] of positions) {
+    const dx = x - pos.x
+    const dy = y - pos.y
+    const distance = Math.sqrt(dx * dx + dy * dy)
+    if (distance < minDistance) return true
+  }
+  return false
+}
+
+function applyCollisionAvoidance(nodes: { id: number; x: number; y: number }[], minDistance: number): { id: number; x: number; y: number }[] {
+  let iterations = 0
+  const maxIterations = 50
+  let moved = true
+
+  while (moved && iterations < maxIterations) {
+    moved = false
+    iterations++
+
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const n1 = nodes[i]
+        const n2 = nodes[j]
+        const dx = n2.x - n1.x
+        const dy = n2.y - n1.y
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        if (distance < minDistance && distance > 0) {
+          const overlap = minDistance - distance
+          const separation = overlap / 2
+          const nx = dx / distance
+          const ny = dy / distance
+
+          n1.x -= nx * separation
+          n1.y -= ny * separation
+          n2.x += nx * separation
+          n2.y += ny * separation
+
+          n1.x = Math.max(40, Math.min(canvasWidth.value - 40, n1.x))
+          n1.y = Math.max(40, Math.min(canvasHeight.value - 40, n1.y))
+          n2.x = Math.max(40, Math.min(canvasWidth.value - 40, n2.x))
+          n2.y = Math.max(40, Math.min(canvasHeight.value - 40, n2.y))
+
+          moved = true
+        }
+      }
+    }
+  }
+
+  return nodes
 }
 
 function draw(ctx: UniApp.CanvasContext): void {
