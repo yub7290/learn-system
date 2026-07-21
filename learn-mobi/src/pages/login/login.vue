@@ -38,7 +38,7 @@
 
       <view class="links">
         <text>忘记密码?</text>
-        <text class="link">注册账号</text>
+        <text class="link" @click="goToRegister">注册账号</text>
       </view>
     </view>
 
@@ -129,6 +129,10 @@ function closeLogin() {
   } else {
     uni.reLaunch({ url: '/pages/index/index' })
   }
+}
+
+function goToRegister() {
+  uni.navigateTo({ url: '/pages/register/register' })
 }
 </script>
 
