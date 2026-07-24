@@ -90,20 +90,25 @@ export function searchCourse(params: { keyword?: string; cateId?: number; tabTyp
   )
 }
 export function getCourseDetail(cid: number): Promise<CourseDetailVO> {
-  return http.get<CourseDetailVO>('/student/course/detail', { cid }).catch(() =>
-    Promise.resolve(mockCourseDetail)
-  )
+  return http.get<CourseDetailVO>('/student/course/detail', { cid }).catch((err: any) => {
+    // 权限不足（200311）属业务拦截：降级为 mock 但明确标记不可学，
+    // 避免详情页误显示「开始学习」（与 getChapterDetail 拦截语义一致，且不引发空白页/死循环）
+    if (err && err.code === COURSE_NO_ACCESS_CODE) return { ...mockCourseDetail, accessible: false }
+    return mockCourseDetail
+  })
 }
 export function getChapterList(cid: number): Promise<{ list: ChapterListItem[] }> {
-  return http.get<{ list: ChapterListItem[] }>('/student/chapter/list', { cid }).catch(() =>
-    Promise.resolve({
+  return http.get<{ list: ChapterListItem[] }>('/student/chapter/list', { cid }).catch((err: any) => {
+    // 权限不足（200311）属业务拦截，绝不降级为 mock，避免抽屉展示 mock 章节
+    if (err && err.code === COURSE_NO_ACCESS_CODE) throw err
+    return Promise.resolve({
       list: mockCourseDetail.chapter.map((ch, i) => ({ id: ch.id, chapterName: `第${i + 1}章 ${ch.name}` })),
     })
-  )
+  })
 }
 export function getChapterDetail(chId: number, cid: number): Promise<ChapterDetailVO> {
   if (!isLoggedIn()) return Promise.reject(new Error('unauthorized'))
-  return http.get<ChapterDetailVO>('/student/chapter/detail', { chId, cid }).catch((err: any) => {
+  return http.get<ChapterDetailVO>('/student/chapter/detail', { chId, cid }, undefined, { showError: false }).catch((err: any) => {
     // 权限不足（200311）属业务拦截，绝不降级为 mock，避免越权返回章节视频/附件
     if (err && err.code === COURSE_NO_ACCESS_CODE) throw err
     const mockChapterDetail: ChapterDetailVO = {
