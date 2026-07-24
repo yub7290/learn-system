@@ -136,6 +136,7 @@ onLoad((q: any) => {
   currentChapterId.value = Number(q.chId) || 0
   if (!cid.value || !currentChapterId.value) {
     uni.showToast({ title: '课程参数错误', icon: 'none' })
+    setTimeout(() => uni.navigateBack().catch(() => uni.reLaunch({ url: '/pages/course/course' })), 1200)
     return
   }
   // 加载即触发服务端权限校验；未登录/无权限由 loadData 统一拦截（阻断深度链接）

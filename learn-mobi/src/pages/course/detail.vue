@@ -149,11 +149,12 @@ function openStudy(chId: number) {
 function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
   if (f.name === 'AI助教') {
     if (!requireLogin('登录后才能使用 AI 助教')) return
+    if (!isCourseAccessible(info.value.accessible)) { showNoAccessModal(cid.value); return }
     uni.navigateTo({ url: `/pages/ai/chat?courseId=${cid.value}` }).catch(() => {})
     return
   }
   if (f.name === '视频/直播') {
-    // 跳转到学习页的第一个章节
+    // 跳转到学习页的第一个章节（openStudy 内已校验权限）
     if (info.value.chapter && info.value.chapter.length > 0) {
       openStudy(info.value.chapter[0].id)
     } else { uni.showToast({ title: '暂无视频内容', icon: 'none' }) }
@@ -161,11 +162,13 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
   }
   if (f.name === '试题练习') {
     if (!requireLogin('登录后才能进行试题练习')) return
+    if (!isCourseAccessible(info.value.accessible)) { showNoAccessModal(cid.value); return }
     uni.navigateTo({ url: `/pages/practice/index?courseId=${cid.value}` }).catch(() => {})
     return
   }
   if (f.name === '在线测试') {
     if (!requireLogin('登录后才能参加在线测试')) return
+    if (!isCourseAccessible(info.value.accessible)) { showNoAccessModal(cid.value); return }
     uni.navigateTo({ url: `/pages/exam/online-test?courseId=${cid.value}` }).catch(() => {})
     return
   }
@@ -182,6 +185,7 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
   }
   if (f.name === '结课考试') {
     if (!requireLogin('登录后才能参加结课考试')) return
+    if (!isCourseAccessible(info.value.accessible)) { showNoAccessModal(cid.value); return }
     handleFinalExam()
     return
   }
@@ -196,11 +200,13 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
   }
   if (f.name === '综合成绩') {
     if (!requireLogin('登录后才能查看综合成绩')) return
+    if (!isCourseAccessible(info.value.accessible)) { showNoAccessModal(cid.value); return }
     uni.navigateTo({ url: `/pages/course/comprehensive-score?courseId=${cid.value}` }).catch(() => {})
     return
   }
   if (f.name === '批改记录') {
     if (!requireLogin('登录后才能查看批改记录')) return
+    if (!isCourseAccessible(info.value.accessible)) { showNoAccessModal(cid.value); return }
     uni.navigateTo({
       url: `/pages/ai/homework-list?courseId=${cid.value}&courseName=${encodeURIComponent(info.value.course.title)}`,
     }).catch(() => {})

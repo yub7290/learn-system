@@ -28,7 +28,8 @@ function onChange(i: number) {
 
 <style scoped lang="scss">
 .app-tabbar {
-  position: fixed;
+  /* u-tabbar 自身已 position:fixed，此处仅提升层叠避免课程卡片「未授权」角标穿透；
+     !important 用于覆盖 uView 内联样式，长期应从卡片侧收敛 stacking context */
   z-index: 999 !important;
 }
 </style>
