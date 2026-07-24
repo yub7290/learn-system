@@ -5,14 +5,14 @@
       <u-search v-model="keyword" placeholder="搜索课程" :showAction="false" @search="doSearch" shape="round" bg-color="#f5f7fa"></u-search>
     </view>
 
-    <u-tabs :list="tabList" :current="tabIndex" @click="onTabClick" line-color="#0195ff" :scrollable="false" :active-style="{ color: '#0195ff', fontWeight: 600 }"></u-tabs>
+    <u-tabs :list="tabList" :current="tabIndex" @click="onTabClick" line-color="#00c6ff" :scrollable="false" :active-style="{ color: '#00c6ff', fontWeight: 600 }"></u-tabs>
 
     <view class="course-grid" v-if="courseList.length">
       <CourseCard v-for="item in courseList" :key="item.id" :item="item" @click="goDetail" />
     </view>
     <u-empty v-else text="暂无课程" mode="data" margin-top="120"></u-empty>
 
-    <u-loadmore v-if="courseList.length" :status="loadStatus" />
+    <u-loadmore v-if="courseList.length" :status="loadStatus" color="#9aa4b2" />
 
     <view class="mask" v-if="drawerShow" @click="drawerShow = false"></view>
     <view class="drawer" :class="{ open: drawerShow }">
@@ -101,8 +101,8 @@ function goDetail(item: CourseListItem) { uni.navigateTo({ url: `/pages/course/d
 
 <style scoped lang="scss">
 .course-page { min-height: 100vh; padding-bottom: 100rpx; }
-.topbar { display: flex; align-items: center; gap: 20rpx; padding: 24rpx 28rpx; background: $bg-card; }
-.course-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20rpx; padding: 24rpx 28rpx; }
+.topbar { display: flex; align-items: center; gap: 20rpx; padding: 24rpx 28rpx; background: $bg-card; box-shadow: 0 1px 0 rgba(0,0,0,.04); }
+.course-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22rpx; padding: 26rpx 28rpx; }
 .mask { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 99; }
 .drawer { position: fixed; left: 0; top: 0; bottom: 0; width: 72%; background: $bg-card; transform: translateX(-100%); transition: transform .25s; z-index: 100; padding-top: 44px; }
 .drawer.open { transform: translateX(0); }

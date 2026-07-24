@@ -10,6 +10,8 @@ export interface CourseListItem {
   courseType: number
   teacherName: string
   feeType?: string
+  /** 当前学员是否可学习该课程（免费课/已购/组绑定）；false 表示未授权，前端展示锁定态 */
+  accessible?: boolean
 }
 export interface CourseDetailVO {
   course: {
@@ -23,6 +25,8 @@ export interface CourseDetailVO {
   chapter: Array<{ id: number; name: string; children?: Array<{ id: number; name: string }> }>
   teacher: { avatar: string; name: string; intro: string }
   aiAssistant?: { enabled: boolean }
+  /** 当前学员是否可学习该课程（免费课/已购/组绑定） */
+  accessible?: boolean
 }
 export interface ChapterDetailVO {
   id: number

@@ -330,7 +330,7 @@ async function goToTaskPage(task: TaskItemVO): Promise<void> {
   const params = 'taskId=' + task.taskId + '&knowledge=' + encodeURIComponent(task.knowledge)
   switch (task.jumpType) {
     case 'course':
-      url = '/pages/course/detail?id=' + targetId + '&' + params
+      url = '/pages/course/detail?cid=' + targetId + '&' + params
       break
     case 'question':
       url = '/pages/practice/question?' + params
@@ -347,7 +347,7 @@ async function goToTaskPage(task: TaskItemVO): Promise<void> {
 
 function goToCourseDetail(course: RecommendCourseVO): void {
   uni.navigateTo({
-    url: '/pages/course/detail?id=' + course.id + '&knowledge=' + encodeURIComponent(course.knowledge),
+    url: '/pages/course/detail?cid=' + course.id + '&knowledge=' + encodeURIComponent(course.knowledge),
   })
 }
 

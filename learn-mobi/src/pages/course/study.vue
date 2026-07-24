@@ -95,6 +95,8 @@ import { getChapterDetail, getChapterList } from '../../api/course'
 import { saveStudyRecord, batchUploadStudy } from '../../api/study'
 import { StorageKey } from '../../utils/storage'
 import { BASE_URL } from '../../env'
+import { requireLogin } from '../../utils/auth'
+import { COURSE_NO_ACCESS_CODE, showNoAccessModal } from '../../utils/permission'
 
 interface AttachItem { id: number; fileName: string; fileSize: string; fileUrl?: string }
 interface VideoItem { id?: number; videoName: string; videoUrl: string; fileSize?: number }
@@ -132,7 +134,12 @@ const liveAttachmentVideos = computed(() => mediaType.value === 'live' ? videoLi
 onLoad((q: any) => {
   cid.value = Number(q.cid) || 0
   currentChapterId.value = Number(q.chId) || 0
-  if (cid.value && currentChapterId.value) loadData()
+  if (!cid.value || !currentChapterId.value) {
+    uni.showToast({ title: '课程参数错误', icon: 'none' })
+    return
+  }
+  // 加载即触发服务端权限校验；未登录/无权限由 loadData 统一拦截（阻断深度链接）
+  loadData()
 })
 
 // 关键修复：页面关闭/卸载时必须清理计时器。
@@ -157,7 +164,19 @@ async function loadData() {
     attachList.value = (d.attachList || []) as AttachItem[]
     const ch = chapterAllList.value.find((c) => c.id === currentChapterId.value)
     currentChapterName.value = ch?.chapterName || ''
-  } catch (e) { uni.showToast({ title: '章节加载失败', icon: 'none' }) }
+  } catch (e: any) {
+    // 无学习权限（200311）：阻断学习页，视频/附件均不渲染，弹出引导
+    if (e?.code === COURSE_NO_ACCESS_CODE) {
+      showNoAccessModal(cid.value)
+      return
+    }
+    // 未登录：提示登录（深度链接直接访问时的兜底）
+    if (e?.message === 'unauthorized') {
+      requireLogin('登录后才能开始学习')
+      return
+    }
+    uni.showToast({ title: '章节加载失败', icon: 'none' })
+  }
   // Load chapter list for drawer
   try {
     const res = await getChapterList(cid.value)
@@ -265,7 +284,7 @@ function downloadFile(f: AttachItem) {
   uni.showLoading({ title: '下载中...', mask: true })
   uni.downloadFile({
     url: downloadUrl,
-    header: { Authorization: 'Bearer ' + (uni.getStorageSync('access_token') || '') },
+    header: { Authorization: 'Bearer ' + (uni.getStorageSync(StorageKey.ACCESS_TOKEN) || '') },
     success(res) {
       uni.hideLoading()
       if (res.statusCode === 200) {

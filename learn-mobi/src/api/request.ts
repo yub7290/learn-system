@@ -127,8 +127,11 @@ export function request<T = any>(opts: RequestOptions): Promise<T> {
             if (r.code === 200) {
               resolve(r.data)
             } else {
+              const err = new Error(r.message || `code ${r.code}`)
+              // 透传业务码，便于调用方针对具体错误（如课程无权限 200311）做差异化引导
+              ;(err as any).code = r.code
               if (showError) uni.showToast({ title: r.message || '请求失败', icon: 'none' })
-              reject(new Error(r.message || `code ${r.code}`))
+              reject(err)
             }
           } catch (err) {
             reject(err instanceof Error ? err : new Error(String(err)))

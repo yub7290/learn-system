@@ -1,5 +1,5 @@
 <template>
-  <u-tabbar :value="current" @change="onChange" active-color="#0195ff" inactive-color="#9aa4b2" :border="false" fixed placeholder safe-area-inset-bottom>
+  <u-tabbar class="app-tabbar" :value="current" @change="onChange" active-color="#00c6ff" inactive-color="#9aa4b2" :border="false" fixed placeholder safe-area-inset-bottom>
     <u-tabbar-item v-for="(t, i) in tabs" :key="i" :text="t.text" :icon="t.icon"></u-tabbar-item>
   </u-tabbar>
 </template>
@@ -25,3 +25,10 @@ function onChange(i: number) {
   uni.reLaunch({ url: urls[i] }).catch(() => {})
 }
 </script>
+
+<style scoped lang="scss">
+.app-tabbar {
+  position: fixed;
+  z-index: 999 !important;
+}
+</style>

@@ -1,6 +1,7 @@
 import { http } from './request'
 import type { CategoryNode, CourseListItem, CourseDetailVO, ChapterDetailVO, ChapterListItem, CourseScoreVO } from '../types/course'
 import { isLoggedIn } from '../utils/auth'
+import { COURSE_NO_ACCESS_CODE } from '../utils/permission'
 
 /* ===== Mock Data ===== */
 
@@ -102,7 +103,9 @@ export function getChapterList(cid: number): Promise<{ list: ChapterListItem[] }
 }
 export function getChapterDetail(chId: number, cid: number): Promise<ChapterDetailVO> {
   if (!isLoggedIn()) return Promise.reject(new Error('unauthorized'))
-  return http.get<ChapterDetailVO>('/student/chapter/detail', { chId, cid }).catch(() => {
+  return http.get<ChapterDetailVO>('/student/chapter/detail', { chId, cid }).catch((err: any) => {
+    // 权限不足（200311）属业务拦截，绝不降级为 mock，避免越权返回章节视频/附件
+    if (err && err.code === COURSE_NO_ACCESS_CODE) throw err
     const mockChapterDetail: ChapterDetailVO = {
       id: chId,
       mediaSrc: 'https://media.w3.org/2010/05/sintel/trailer.mp4',

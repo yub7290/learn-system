@@ -17,9 +17,9 @@
 
     <!-- 开始学习按钮 -->
     <view class="start-bar" @click="startLearning">
-      <view class="start-btn">
-        <u-icon name="play-circle" color="#fff" size="20"></u-icon>
-        <text class="start-text">开始学习</text>
+      <view class="start-btn" :class="{ locked: locked }">
+        <u-icon :name="locked ? 'lock' : 'play-circle'" color="#fff" size="20"></u-icon>
+        <text class="start-text">{{ locked ? '无学习权限' : '开始学习' }}</text>
       </view>
     </view>
 
@@ -80,11 +80,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getCourseDetail } from '../../api/course'
 import { getCourseFinalExam } from '../../api/exam'
 import { requireLogin } from '../../utils/auth'
+import { isCourseAccessible, showNoAccessModal } from '../../utils/permission'
 import type { CourseDetailVO } from '../../types/course'
 
 const cid = ref(0)
@@ -107,6 +108,9 @@ const funcList = [
   { name: '批改记录', icon: 'checkmark-circle' },
 ]
 
+// 无学习权限（非免费且未购/未绑定）→ 锁定"开始学习"按钮（accessible 由后端 canAccess 注入）
+const locked = computed(() => !isCourseAccessible(info.value.accessible))
+
 onLoad((q: any) => { cid.value = Number(q.cid) || 0; if (cid.value) loadDetail() })
 
 async function loadDetail() {
@@ -123,6 +127,10 @@ function toggleChapter(id: number) {
 /** 开始学习：跳转到第一章 */
 function startLearning() {
   if (!requireLogin('登录后才能开始学习并保存学习进度')) return
+  if (!isCourseAccessible(info.value.accessible)) {
+    showNoAccessModal(cid.value)
+    return
+  }
   if (info.value.chapter && info.value.chapter.length > 0) {
     openStudy(info.value.chapter[0].id)
   } else {
@@ -132,6 +140,10 @@ function startLearning() {
 
 function openStudy(chId: number) {
   if (!requireLogin('登录后才能开始学习并保存学习进度')) return
+  if (!isCourseAccessible(info.value.accessible)) {
+    showNoAccessModal(cid.value)
+    return
+  }
   uni.navigateTo({ url: `/pages/course/study?cid=${cid.value}&chId=${chId}` }).catch(() => {})
 }
 function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
@@ -158,6 +170,11 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
     return
   }
   if (f.name === '知识库') {
+    if (!requireLogin('登录后才能查看课程知识库')) return
+    if (!isCourseAccessible(info.value.accessible)) {
+      showNoAccessModal(cid.value)
+      return
+    }
     uni.navigateTo({
       url: `/pages/course/knowledge-list?courseId=${cid.value}&courseName=${encodeURIComponent(info.value.course.title)}`,
     }).catch(() => {})
@@ -169,6 +186,11 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
     return
   }
   if (f.name === '课程公告') {
+    if (!requireLogin('登录后才能查看课程公告')) return
+    if (!isCourseAccessible(info.value.accessible)) {
+      showNoAccessModal(cid.value)
+      return
+    }
     uni.navigateTo({ url: `/pages/course/announcement-list?cid=${cid.value}` }).catch(() => {})
     return
   }
@@ -222,6 +244,7 @@ async function handleFinalExam() {
 .start-bar { margin: -18px 12px 0; position: relative; z-index: 2; }
 .start-btn { display: flex; align-items: center; justify-content: center; gap: 6px; background: $gradient-primary; color: #fff; padding: 10px 0; border-radius: 21px; font-size: 14px; font-weight: 600; box-shadow: 0 4px 12px rgba(1,149,255,.35); }
 .start-text { font-size: 15px; }
+.start-btn.locked { background: #c0c4cc; box-shadow: none; }
 
 .func-grid { background: $bg-card; margin: 10px 12px 0; border-radius: 12px; padding: 12px 4px; display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; box-shadow: $shadow-card; }
 .func-item { text-align: center; padding: 4px 0; }

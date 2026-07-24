@@ -214,7 +214,7 @@ function handleTaskClick(task: DailyTaskVO): void {
   if (!requireLogin('登录后才能查看学习任务')) return
   const params = 'taskId=' + task.id + '&knowledge=' + encodeURIComponent(task.knowledge)
   if (task.type === 'course' || task.type === 'learn' || task.type === 'preview') {
-    uni.navigateTo({ url: '/pages/course/detail?id=' + task.id + '&' + params })
+    uni.navigateTo({ url: '/pages/course/detail?cid=' + task.id + '&' + params })
     return
   }
   if (task.type === 'practice' || task.type === 'review') {
