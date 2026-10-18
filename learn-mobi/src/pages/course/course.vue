@@ -27,22 +27,19 @@
         >
           <text>{{ c.name }}</text>
         </view>
-        <view
-          class="cate-sub-item"
-          v-for="c in categoryList"
-          :key="'sub-' + c.id"
-          v-if="c.children && c.children.length"
-        >
-          <view
-            class="cate-child"
-            v-for="sub in c.children"
-            :key="sub.id"
-            :class="{ active: sub.id === currentCateId }"
-            @click="selectCate(sub.id)"
-          >
-            <text>{{ sub.name }}</text>
+        <template v-for="c in categoryList" :key="'sub-' + c.id">
+          <view v-if="c.children && c.children.length" class="cate-sub-item">
+            <view
+              class="cate-child"
+              v-for="sub in c.children"
+              :key="sub.id"
+              :class="{ active: sub.id === currentCateId }"
+              @click="selectCate(sub.id)"
+            >
+              <text>{{ sub.name }}</text>
+            </view>
           </view>
-        </view>
+        </template>
         <u-empty v-if="!categoryList.length" text="暂无分类" mode="list" margin-top="60"></u-empty>
       </scroll-view>
     </view>

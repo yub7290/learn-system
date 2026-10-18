@@ -22,11 +22,16 @@ export interface CourseDetailVO {
     desc: string
     target: string
   }
-  chapter: Array<{ id: number; name: string; children?: Array<{ id: number; name: string }> }>
+  chapter: CourseChapterNode[]
   teacher: { avatar: string; name: string; intro: string }
   aiAssistant?: { enabled: boolean }
   /** 当前学员是否可学习该课程（免费课/已购/组绑定） */
   accessible?: boolean
+}
+export interface CourseChapterNode {
+  id: number
+  name: string
+  children?: CourseChapterNode[]
 }
 export interface ChapterDetailVO {
   id: number
@@ -34,9 +39,14 @@ export interface ChapterDetailVO {
   mediaType: 'live' | 'video'
   article: string
   attachList: Array<{ id: number; fileName: string; fileSize: string }>
-  videoList?: Array<{ id?: number; videoName: string; videoUrl: string; fileSize?: number }>
+  videoList?: Array<{ id?: number; assetId?: number; videoName: string; videoUrl: string; fileSize?: number; playbackType?: 'hls' | 'file' }>
 }
-export interface ChapterListItem { id: number; chapterName: string }
+export interface ChapterListItem {
+  id: number
+  chapterName: string
+  /** 子章节；空数组表示叶子章节，可直接进入学习页。 */
+  children?: ChapterListItem[]
+}
 
 /** 综合成绩 - 考试历史记录 */
 export interface CourseExamHistoryVO {

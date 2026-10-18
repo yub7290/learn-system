@@ -36,3 +36,4 @@ reasonix.toml
 /AGENTS.md
 .workbuddy
 .tmp
+*.log.gz

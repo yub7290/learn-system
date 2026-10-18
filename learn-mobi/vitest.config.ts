@@ -1,9 +1,11 @@
 import { defineConfig } from 'vitest/config'
+import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
+  plugins: [vue()],
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
   },
-  // Don't use the @dcloudio/vite-plugin-uni — pure logic tests don't need it
+  // The plain video SFC uses Vue's custom renderer; no uni-app runtime or DOM dependency.
 })

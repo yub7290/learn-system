@@ -1,9 +1,29 @@
 <template>
   <view class="study-page">
     <view class="player-box">
-      <video v-if="mediaType === 'video' && mediaSrc" :key="mediaSrc" class="player" :src="mediaSrc" :initial-time="playProgress" object-fit="contain" @timeupdate="onTimeUpdate" @ended="onVideoEnd" @error="onVideoError" @play="startTimer" @pause="pauseTimer" controls></video>
-      <live-player v-if="mediaType === 'live'" class="player" :src="mediaSrc" @play="startTimer" @pause="pauseTimer" @error="onVideoError" autoplay></live-player>
-      <view v-if="mediaType === 'video' && !mediaSrc" class="player-empty">暂无视频</view>
+      <!-- #ifdef H5 -->
+      <HlsVideo v-if="mediaType === 'video' && mediaSrc" ref="hlsVideo" :key="playerKey" class="player" :src="mediaSrc" :initial-time="playProgress" @loadstart="onMediaLoadStart" @ready="onMediaReady" @waiting="onMediaWaiting" @timeout="onMediaTimeout" @seeking="clearPlayTimer" @playing="onMediaPlaying" @timeupdate="onTimeUpdate" @ended="onVideoEnd" @error="onVideoError" @pause="onMediaPause" @metric="onPlaybackMetric" @playblocked="onPlayBlocked" />
+      <!-- #endif -->
+      <!-- #ifndef H5 -->
+      <video v-if="mediaType === 'video' && mediaSrc" :key="playerKey" class="player" :src="mediaSrc" :initial-time="playProgress" object-fit="contain" @loadstart="onMediaLoadStart" @loadedmetadata="onMediaReady" @canplay="onMediaReady" @waiting="onMediaWaiting" @playing="onMediaPlaying" @timeupdate="onTimeUpdate" @ended="onVideoEnd" @error="onVideoError" @play="startTimer" @pause="onMediaPause" controls></video>
+      <!-- #endif -->
+      <live-player v-if="mediaType === 'live'" class="player" :src="mediaSrc" @play="onMediaPlaying" @statechange="onLiveStateChange" @pause="pauseTimer" @error="onVideoError" autoplay></live-player>
+      <view v-if="!chapterLoading && mediaType === 'video' && !mediaSrc && !mediaError" class="player-empty">暂无视频</view>
+      <view v-if="chapterLoading || mediaLoading" class="player-loading" role="status" aria-live="polite">
+        <view class="loading-spinner"></view>
+        <text>{{ chapterLoading ? '章节内容加载中...' : '视频缓冲中...' }}</text>
+      </view>
+      <view v-if="mediaError" class="player-error" :class="{ 'player-error-soft': mediaErrorKind === 'timeout' }">
+        <view class="player-notice" :role="mediaErrorKind === 'timeout' ? 'status' : 'alert'" aria-live="polite">
+          <text>{{ mediaError }}</text>
+          <view class="player-actions">
+            <!-- #ifdef H5 -->
+            <button v-if="mediaErrorKind === 'timeout'" class="retry-button" @click="resumeVideo">尝试播放</button>
+            <!-- #endif -->
+            <button class="retry-button" @click="retryCurrentChapter">重新加载</button>
+          </view>
+        </view>
+      </view>
       <view class="player-back" @click="goBack"><u-icon name="arrow-left" color="#fff" size="20"></u-icon></view>
       <view class="player-menu" @click="drawerShow = true"><u-icon name="list" color="#fff" size="20"></u-icon></view>
     </view>
@@ -82,36 +102,60 @@
     <view class="drawer" :class="{ open: drawerShow }">
       <view class="drawer-title">全部章节</view>
       <scroll-view scroll-y class="drawer-scroll">
-        <view class="d-item" v-for="ch in chapterAllList" :key="ch.id" :class="{ active: ch.id === currentChapterId }" @click="switchChapter(ch)">{{ ch.chapterName }}</view>
+        <view
+          class="d-item"
+          v-for="row in chapterTreeRows"
+          :key="row.node.id"
+          :class="{ active: row.node.id === currentChapterId, parent: row.hasChildren }"
+          :style="{ paddingLeft: `${12 + row.depth * 18}px` }"
+          @click="selectChapterNode(row.node)"
+        >
+          <u-icon v-if="row.hasChildren" :name="expandedChapterIds.has(row.node.id) ? 'arrow-down' : 'arrow-right'" color="#9aa4b2" size="13" class="d-toggle"></u-icon>
+          <view v-else class="d-toggle-spacer"></view>
+          <text>{{ row.node.chapterName }}</text>
+        </view>
       </scroll-view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onUnmounted } from 'vue'
 import { onLoad, onUnload, onHide } from '@dcloudio/uni-app'
+// #ifdef H5
+import HlsVideo from '../../components/HlsVideo.vue'
+// #endif
 import { getChapterDetail, getChapterList } from '../../api/course'
 import { saveStudyRecord, batchUploadStudy } from '../../api/study'
 import { StorageKey } from '../../utils/storage'
 import { BASE_URL } from '../../env'
 import { requireLogin } from '../../utils/auth'
 import { COURSE_NO_ACCESS_CODE, showNoAccessModal } from '../../utils/permission'
+import type { ChapterListItem } from '../../types/course'
+import type { VideoPlaybackMetric } from '../../utils/videoPlayback'
 
 interface AttachItem { id: number; fileName: string; fileSize: string; fileUrl?: string }
 interface VideoItem { id?: number; videoName: string; videoUrl: string; fileSize?: number }
 interface ChatMsg { id: number; userName: string; content: string }
+interface ChapterTreeRow { node: ChapterListItem; depth: number; hasChildren: boolean }
 
 const cid = ref(0)
 const currentChapterId = ref(0)
 const currentChapterName = ref('')
 const mediaType = ref<'video' | 'live'>('video')
 const mediaSrc = ref('')
+const chapterLoading = ref(false)
+const mediaLoading = ref(false)
+const mediaError = ref('')
+const mediaErrorKind = ref<'timeout' | 'fatal' | ''>('')
+const hlsVideo = ref<{ reload: () => void; resume: () => void } | null>(null)
+const playerKey = ref(0)
 const videoList = ref<VideoItem[]>([])
 const currentVideoIndex = ref(0)
 const articleContent = ref('')
 const attachList = ref<AttachItem[]>([])
-const chapterAllList = ref<Array<{ id: number; chapterName: string }>>([])
+const chapterAllList = ref<ChapterListItem[]>([])
+const expandedChapterIds = ref(new Set<number>())
 const bottomTab = ref(2)
 const drawerShow = ref(false)
 const chatMsgs = ref<ChatMsg[]>([])
@@ -121,15 +165,30 @@ const chatInput = ref('')
 const playProgress = ref(0)
 const playSecond = ref(0)
 const totalStudySecond = ref(0)
+const mediaDuration = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
 let lastUploadTime = 0
 let lastTimeUpdate = 0
+let chapterRequestId = 0
+let mediaLoadTimer: ReturnType<typeof setTimeout> | null = null
 
 const progressPercent = computed(() => {
-  if (!totalStudySecond.value) return 0
-  return Math.min(100, Math.round((playSecond.value / Math.max(1, totalStudySecond.value)) * 100))
+  if (!mediaDuration.value) return 0
+  return Math.min(100, Math.round((playSecond.value / Math.max(1, mediaDuration.value)) * 100))
 })
 const liveAttachmentVideos = computed(() => mediaType.value === 'live' ? videoList.value : [])
+const chapterTreeRows = computed<ChapterTreeRow[]>(() => {
+  const rows: ChapterTreeRow[] = []
+  const walk = (nodes: ChapterListItem[], depth: number) => {
+    nodes.forEach((node) => {
+      const hasChildren = !!node.children?.length
+      rows.push({ node, depth, hasChildren })
+      if (hasChildren && expandedChapterIds.value.has(node.id)) walk(node.children!, depth + 1)
+    })
+  }
+  walk(chapterAllList.value, 0)
+  return rows
+})
 
 onLoad((q: any) => {
   cid.value = Number(q.cid) || 0
@@ -149,56 +208,87 @@ onLoad((q: any) => {
 // 不断触发响应式重渲染与上报请求，最终拖垮 JS 线程 → 卡顿 / 卡退。
 // 同时 onHide 时暂停计时，避免切后台仍累计时长。
 function clearPlayTimer() { if (timer) { clearInterval(timer); timer = null } }
-onUnload(() => { clearPlayTimer(); flushOfflineQueue() })
-onHide(() => { pauseTimer() })
-onUnmounted(() => { clearPlayTimer(); flushOfflineQueue() })
+function clearMediaLoadTimer() { if (mediaLoadTimer) { clearTimeout(mediaLoadTimer); mediaLoadTimer = null } }
+function invalidatePendingLoad() { chapterRequestId++; clearMediaLoadTimer() }
+onUnload(() => { invalidatePendingLoad(); clearPlayTimer(); flushOfflineQueue() })
+onHide(() => { clearMediaLoadTimer(); pauseTimer() })
+onUnmounted(() => { invalidatePendingLoad(); clearPlayTimer(); flushOfflineQueue() })
 
 async function loadData() {
-  // Load chapter detail
+  const requestId = ++chapterRequestId
+  const chapterId = currentChapterId.value
+  chapterLoading.value = true
+  mediaLoading.value = true
+  mediaError.value = ''
+  mediaErrorKind.value = ''
   try {
-    const d = await getChapterDetail(currentChapterId.value, cid.value)
+    const [d, res] = await Promise.all([
+      getChapterDetail(chapterId, cid.value),
+      chapterAllList.value.length
+        ? Promise.resolve({ list: chapterAllList.value })
+        : getChapterList(cid.value),
+    ])
+    if (requestId !== chapterRequestId || chapterId !== currentChapterId.value) return
+
+    chapterAllList.value = res.list || []
+    expandChapterPath(chapterId)
     videoList.value = (d.videoList || []).filter((item: VideoItem) => !!item.videoUrl)
     mediaType.value = d.mediaType === 'live' ? 'live' : 'video'
     currentVideoIndex.value = 0
-    mediaSrc.value = mediaType.value === 'live' ? (d.mediaSrc || '') : (videoList.value[0]?.videoUrl || d.mediaSrc || '')
+    const nextMediaSrc = mediaType.value === 'live' ? (d.mediaSrc || '') : (videoList.value[0]?.videoUrl || d.mediaSrc || '')
+    // 兼容旧的父章节深链接：父节点本身没有视频时自动进入第一个叶子章节。
+    const selectedNode = findChapterNode(chapterAllList.value, chapterId)
+    const firstLeaf = selectedNode?.children?.length ? findFirstLeaf(selectedNode) : null
+    if (!nextMediaSrc && firstLeaf && firstLeaf.id !== chapterId) {
+      currentChapterId.value = firstLeaf.id
+      return loadData()
+    }
     articleContent.value = d.article || ''
     attachList.value = (d.attachList || []) as AttachItem[]
-    const ch = chapterAllList.value.find((c) => c.id === currentChapterId.value)
+    const ch = findChapterNode(chapterAllList.value, chapterId)
     currentChapterName.value = ch?.chapterName || ''
+    try {
+      const cache = uni.getStorageSync(`study_record_${cid.value}_${chapterId}`)
+      if (cache) {
+        const c = typeof cache === 'string' ? JSON.parse(cache) : cache
+        playSecond.value = c.playSecond || 0
+        totalStudySecond.value = c.totalStudySecond || 0
+        playProgress.value = playSecond.value
+      }
+    } catch (e) { /* ignore damaged local cache */ }
+
+    mediaSrc.value = nextMediaSrc
+    playerKey.value++
+    await nextTick()
+    if (requestId !== chapterRequestId) return
+    chapterLoading.value = false
+    if (!nextMediaSrc) mediaLoading.value = false
+    // H5 watchdog reads the actual media state inside HlsVideo.
+    // #ifndef H5
+    else armMediaLoadTimeout()
+    // #endif
   } catch (e: any) {
-    // 无学习权限（200311）：阻断学习页，视频/附件均不渲染，弹出引导
+    if (requestId !== chapterRequestId) return
+    chapterLoading.value = false
+    mediaLoading.value = false
+    mediaSrc.value = ''
     if (e?.code === COURSE_NO_ACCESS_CODE) {
       showNoAccessModal(cid.value)
       return
     }
-    // 未登录：提示登录（深度链接直接访问时的兜底）
     if (e?.message === 'unauthorized') {
       requireLogin('登录后才能开始学习')
       return
     }
-    uni.showToast({ title: '章节加载失败', icon: 'none' })
+    mediaError.value = '章节加载失败，请检查网络后重试'
+    mediaErrorKind.value = 'fatal'
   }
-  // Load chapter list for drawer
-  try {
-    const res = await getChapterList(cid.value)
-    chapterAllList.value = res.list || []
-    const ch = (res.list || []).find((c: any) => c.id === currentChapterId.value)
-    if (ch && !currentChapterName.value) currentChapterName.value = ch.chapterName
-  } catch (e) { /* stub --- empty */ }
-  // Restore local progress cache (mirrors old study.js: storage key study_record_{cid}_{chId})
-  try {
-    const cache = uni.getStorageSync(`study_record_${cid.value}_${currentChapterId.value}`)
-    if (cache) {
-      const c = typeof cache === 'string' ? JSON.parse(cache) : cache
-      playSecond.value = c.playSecond || 0
-      totalStudySecond.value = c.totalStudySecond || 0
-      playProgress.value = playSecond.value
-    }
-  } catch (e) { /* ignore parse errors */ }
 }
 
 function onTimeUpdate(e: any) {
   const t = Math.floor(e.detail.currentTime || 0)
+  const duration = Math.floor(e.detail.duration || 0)
+  if (duration > 0) mediaDuration.value = duration
   // 节流：timeupdate 约每秒触发 4 次，降低刷新频率避免频繁重渲染造成卡顿
   const now = Date.now()
   if (now - lastTimeUpdate >= 1000 || t === 0) {
@@ -206,10 +296,92 @@ function onTimeUpdate(e: any) {
     playSecond.value = t
   }
 }
-function onVideoError() {
-  uni.showToast({ title: '视频加载失败，请稍后重试', icon: 'none' })
+function armMediaLoadTimeout() {
+  if (mediaLoadTimer) return
+  mediaLoadTimer = setTimeout(() => {
+    mediaLoadTimer = null
+    if (!mediaLoading.value) return
+    onMediaTimeout()
+  }, 30000)
 }
-function onVideoEnd() { pauseTimer(); uploadRecord() }
+function onMediaLoadStart() {
+  mediaLoading.value = true
+  mediaError.value = ''
+  mediaErrorKind.value = ''
+  // #ifndef H5
+  armMediaLoadTimeout()
+  // #endif
+}
+function onMediaReady(e?: any) {
+  const duration = Math.floor(e?.detail?.duration || 0)
+  if (duration > 0) mediaDuration.value = duration
+  mediaLoading.value = false
+  clearMediaLoadTimer()
+  // Metadata/progress may recover a timeout, but must not dismiss a real failure.
+  if (mediaErrorKind.value === 'timeout') {
+    mediaError.value = ''
+    mediaErrorKind.value = ''
+  }
+}
+function onMediaWaiting() {
+  if (!chapterLoading.value) {
+    mediaLoading.value = true
+    clearPlayTimer()
+    // #ifndef H5
+    armMediaLoadTimeout()
+    // #endif
+  }
+}
+function onMediaTimeout(e?: any) {
+  if (mediaErrorKind.value === 'fatal') return
+  mediaLoading.value = false
+  mediaErrorKind.value = 'timeout'
+  mediaError.value = e?.detail?.reason === 'seek'
+    ? '视频定位较慢，可继续等待或重新加载'
+    : '视频准备较慢，可点击播放或重新加载'
+  clearMediaLoadTimer()
+  clearPlayTimer()
+}
+function onMediaPlaying() {
+  onMediaReady()
+  if (mediaErrorKind.value === 'fatal') return
+  startTimer()
+}
+function onMediaPause() {
+  clearMediaLoadTimer()
+  mediaLoading.value = false
+  pauseTimer()
+}
+function resumeVideo() { hlsVideo.value?.resume() }
+function onPlayBlocked() { uni.showToast({ title: '请点击播放器的播放按钮', icon: 'none' }) }
+function onPlaybackMetric(e: { detail: VideoPlaybackMetric & { engine: string } }) {
+  // Local diagnostics only: no playback URL, token or account information.
+  const record = { ...e.detail, at: new Date().toISOString(), courseId: cid.value,
+    chapterId: currentChapterId.value, videoIndex: currentVideoIndex.value }
+  console.info('[video-playback]', record)
+  // #ifdef H5
+  try {
+    const key = 'learn-video-playback-metrics'
+    const previous = JSON.parse(sessionStorage.getItem(key) || '[]')
+    const records = Array.isArray(previous) ? previous.slice(-49) : []
+    records.push(record)
+    sessionStorage.setItem(key, JSON.stringify(records))
+  } catch { /* Private browsing/storage limits must not affect playback. */ }
+  // #endif
+}
+function onLiveStateChange(e: any) {
+  const code = Number(e?.detail?.code)
+  if ([2004, 2007].includes(code)) onMediaReady()
+  if (code < 0) onVideoError({ detail: { message: '直播流加载失败' } })
+}
+function onVideoError(e?: any) {
+  mediaLoading.value = false
+  clearMediaLoadTimer()
+  mediaError.value = e?.detail?.message || '视频加载失败，请稍后重试'
+  mediaErrorKind.value = 'fatal'
+  clearPlayTimer()
+}
+function onVideoEnd() { pauseTimer() }
 function startTimer() { if (timer) return; timer = setInterval(() => { totalStudySecond.value++; const now = Date.now(); if (now - lastUploadTime > 15000) { lastUploadTime = now; uploadRecord() } }, 1000) }
 function pauseTimer() { clearPlayTimer(); uploadRecord() }
 
@@ -232,8 +404,62 @@ function flushOfflineQueue() {
   batchUploadStudy(queue).then(() => { uni.removeStorageSync(StorageKey.STUDY_OFFLINE_QUEUE) }).catch(() => { /* keep for next retry */ })
 }
 
-function switchChapter(ch: { id: number; chapterName: string }) {
+function findChapterNode(nodes: ChapterListItem[], id: number): ChapterListItem | null {
+  for (const node of nodes) {
+    if (node.id === id) return node
+    if (node.children?.length) {
+      const found = findChapterNode(node.children, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function findFirstLeaf(node: ChapterListItem): ChapterListItem | null {
+  if (!node.children?.length) return node
+  for (const child of node.children) {
+    const leaf = findFirstLeaf(child)
+    if (leaf) return leaf
+  }
+  return null
+}
+
+function findChapterPath(nodes: ChapterListItem[], id: number, path: number[] = []): number[] | null {
+  for (const node of nodes) {
+    const nextPath = [...path, node.id]
+    if (node.id === id) return nextPath
+    if (node.children?.length) {
+      const found = findChapterPath(node.children, id, nextPath)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function expandChapterPath(id: number) {
+  const path = findChapterPath(chapterAllList.value, id)
+  if (!path || path.length < 2) return
+  expandedChapterIds.value = new Set(path.slice(0, -1))
+}
+
+function selectChapterNode(ch: ChapterListItem) {
+  if (ch.children?.length) {
+    const expanded = new Set(expandedChapterIds.value)
+    expanded.has(ch.id) ? expanded.delete(ch.id) : expanded.add(ch.id)
+    expandedChapterIds.value = expanded
+    return
+  }
+  switchChapter(ch)
+}
+
+function switchChapter(ch: ChapterListItem) {
   drawerShow.value = false
+  if (ch.children?.length) {
+    selectChapterNode(ch)
+    return
+  }
+  if (ch.id === currentChapterId.value) return
+  invalidatePendingLoad()
   pauseTimer()
   currentChapterId.value = ch.id
   currentChapterName.value = ch.chapterName
@@ -241,6 +467,7 @@ function switchChapter(ch: { id: number; chapterName: string }) {
   currentVideoIndex.value = 0
   mediaSrc.value = ''
   playSecond.value = 0; totalStudySecond.value = 0; playProgress.value = 0
+  mediaDuration.value = 0
   lastUploadTime = 0
   lastTimeUpdate = 0
   timer = null
@@ -252,11 +479,40 @@ function switchVideo(index: number) {
   if (!video || index === currentVideoIndex.value) return
   pauseTimer()
   currentVideoIndex.value = index
+  mediaError.value = ''
+  mediaErrorKind.value = ''
+  mediaLoading.value = true
+  // #ifndef H5
+  armMediaLoadTimeout()
+  // #endif
   mediaSrc.value = video.videoUrl
+  playerKey.value++
   playSecond.value = 0
   playProgress.value = 0
+  mediaDuration.value = 0
   lastUploadTime = 0
   lastTimeUpdate = 0
+}
+
+function retryCurrentChapter() {
+  // Keep the selected video and its current position when reloading the media.
+  // Chapter/API failures still go through loadData and its permission checks.
+  // #ifdef H5
+  if (mediaSrc.value && hlsVideo.value) {
+    clearMediaLoadTimer()
+    clearPlayTimer()
+    mediaError.value = ''
+    mediaErrorKind.value = ''
+    hlsVideo.value.reload()
+    return
+  }
+  // #endif
+  invalidatePendingLoad()
+  pauseTimer()
+  mediaError.value = ''
+  mediaErrorKind.value = ''
+  mediaSrc.value = ''
+  loadData()
 }
 
 function handleTabClick(idx: number) {
@@ -347,8 +603,16 @@ function getFileIconClass(name: string): string {
 .player-box { position: relative; height: 220px; background: #000; }
 .player { width: 100%; height: 100%; }
 .player-empty { height: 100%; display: flex; align-items: center; justify-content: center; color: #a8b0bd; font-size: 14px; }
-.player-back { position: absolute; top: 12px; left: 12px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
-.player-menu { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+.player-loading, .player-error { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #d7dce5; font-size: 13px; background: rgba(0,0,0,.35); pointer-events: none; }
+.player-error-soft { background: transparent; }
+.player-notice { max-width: calc(100% - 80px); padding: 10px 12px; border-radius: 8px; background: rgba(0,0,0,.8); text-align: center; pointer-events: auto; }
+.player-actions { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+.loading-spinner { width: 28px; height: 28px; border: 3px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; animation: player-spin .8s linear infinite; }
+.retry-button { display: flex; align-items: center; justify-content: center; min-height: 44px; margin: 0; padding: 0 12px; font-size: 13px; line-height: 1.4; color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.75); border-radius: 16px; }
+.retry-button::after { border: 0; }
+@keyframes player-spin { to { transform: rotate(360deg); } }
+.player-back { position: absolute; z-index: 4; top: 12px; left: 12px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+.player-menu { position: absolute; z-index: 4; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
 .ch-bar { display: flex; align-items: center; padding: 12px 14px; border-bottom: 1px solid $border; }
 .ch-title { font-size: 14px; font-weight: 600; color: $text-1; flex: 1; }
 .ch-progress { font-size: 11px; color: $text-3; }
@@ -390,6 +654,9 @@ function getFileIconClass(name: string): string {
 .drawer.open { transform: translateX(0); }
 .drawer-title { font-size: 15px; font-weight: 700; padding: 14px 16px; color: $text-1; }
 .drawer-scroll { height: calc(100vh - 50px); }
-.d-item { padding: 14px 16px; font-size: 14px; color: $text-2; border-bottom: 1px solid $border; }
+.d-item { display: flex; align-items: center; gap: 5px; min-height: 46px; padding-top: 12px; padding-right: 16px; padding-bottom: 12px; font-size: 14px; color: $text-2; border-bottom: 1px solid $border; box-sizing: border-box; }
+.d-item.parent { font-weight: 600; color: $text-1; }
 .d-item.active { color: $primary; background: $primary-bg; }
+.d-toggle { flex: 0 0 13px; }
+.d-toggle-spacer { width: 13px; flex: 0 0 13px; }
 </style>

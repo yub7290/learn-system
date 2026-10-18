@@ -41,26 +41,19 @@
       </view>
       <view v-if="tabIndex === 1" class="tab-panel">
         <view class="chapter-list">
-          <template v-for="ch in info.chapter" :key="ch.id">
-            <!-- 父章节（有children） -->
-            <view v-if="ch.children && ch.children.length" class="chapter-parent" @click.stop="toggleChapter(ch.id)">
-              <u-icon :name="expandedIds.has(ch.id) ? 'arrow-down' : 'arrow-right'" color="#999" size="14"></u-icon>
-              <text class="chapter-parent-name">{{ ch.name }}</text>
-              <text class="chapter-count">{{ ch.children.length }}节</text>
-            </view>
-            <!-- 有children时渲染子章节 -->
-            <template v-if="expandedIds.has(ch.id) && ch.children">
-              <view class="chapter-child" v-for="sub in ch.children" :key="sub.id" @click="openStudy(sub.id)">
-                <text class="chapter-child-name">{{ sub.name }}</text>
-                <view class="ch-btn">学习</view>
-              </view>
-            </template>
-            <!-- 无children直接渲染（兜底） -->
-            <view v-else-if="!ch.children || !ch.children.length" class="chapter-item" @click="openStudy(ch.id)">
-              <text class="ch-name">{{ ch.name }}</text>
-              <view class="ch-btn">学习</view>
-            </view>
-          </template>
+          <view
+            v-for="row in chapterRows"
+            :key="row.node.id"
+            :class="row.hasChildren ? 'chapter-parent' : (row.depth ? 'chapter-child' : 'chapter-item')"
+            :style="{ paddingLeft: `${row.depth * 18}px` }"
+            @click="selectChapterRow(row)"
+          >
+            <u-icon v-if="row.hasChildren" :name="expandedIds.has(row.node.id) ? 'arrow-down' : 'arrow-right'" color="#999" size="14"></u-icon>
+            <view v-else class="chapter-toggle-spacer"></view>
+            <text :class="row.hasChildren ? 'chapter-parent-name' : (row.depth ? 'chapter-child-name' : 'ch-name')">{{ row.node.name }}</text>
+            <text v-if="row.hasChildren" class="chapter-count">{{ row.node.children?.length }}节</text>
+            <view v-else class="ch-btn">学习</view>
+          </view>
           <u-empty v-if="!info.chapter.length" text="暂无章节" mode="list" margin-top="30"></u-empty>
         </view>
       </view>
@@ -86,7 +79,7 @@ import { getCourseDetail } from '../../api/course'
 import { getCourseFinalExam } from '../../api/exam'
 import { requireLogin } from '../../utils/auth'
 import { isCourseAccessible, showNoAccessModal } from '../../utils/permission'
-import type { CourseDetailVO } from '../../types/course'
+import type { CourseChapterNode, CourseDetailVO } from '../../types/course'
 
 const cid = ref(0)
 const tabIndex = ref(1)  // 默认选中章节 tab
@@ -110,6 +103,18 @@ const funcList = [
 
 // 无学习权限（非免费且未购/未绑定）→ 锁定"开始学习"按钮（accessible 由后端 canAccess 注入）
 const locked = computed(() => !isCourseAccessible(info.value.accessible))
+const chapterRows = computed(() => {
+  const rows: Array<{ node: CourseChapterNode; depth: number; hasChildren: boolean }> = []
+  const walk = (nodes: CourseChapterNode[], depth: number) => {
+    nodes.forEach((node) => {
+      const hasChildren = !!node.children?.length
+      rows.push({ node, depth, hasChildren })
+      if (hasChildren && expandedIds.value.has(node.id)) walk(node.children!, depth + 1)
+    })
+  }
+  walk(info.value.chapter || [], 0)
+  return rows
+})
 
 onLoad((q: any) => { cid.value = Number(q.cid) || 0; if (cid.value) loadDetail() })
 
@@ -124,6 +129,11 @@ function toggleChapter(id: number) {
   expandedIds.value = s
 }
 
+function selectChapterRow(row: { node: CourseChapterNode; hasChildren: boolean }) {
+  if (row.hasChildren) toggleChapter(row.node.id)
+  else openStudy(row.node.id)
+}
+
 /** 开始学习：跳转到第一章 */
 function startLearning() {
   if (!requireLogin('登录后才能开始学习并保存学习进度')) return
@@ -132,7 +142,8 @@ function startLearning() {
     return
   }
   if (info.value.chapter && info.value.chapter.length > 0) {
-    openStudy(info.value.chapter[0].id)
+    const first = findFirstLeaf(info.value.chapter)
+    openStudy(first?.id || info.value.chapter[0].id)
   } else {
     uni.showToast({ title: '暂无章节内容', icon: 'none' })
   }
@@ -146,6 +157,19 @@ function openStudy(chId: number) {
   }
   uni.navigateTo({ url: `/pages/course/study?cid=${cid.value}&chId=${chId}` }).catch(() => {})
 }
+
+function findFirstLeaf(nodes: CourseChapterNode[]): CourseChapterNode | null {
+  for (const node of nodes) {
+    if (node.children?.length) {
+      const leaf = findFirstLeaf(node.children)
+      if (leaf) return leaf
+    } else {
+      return node
+    }
+  }
+  return null
+}
+
 function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
   if (f.name === 'AI助教') {
     if (!requireLogin('登录后才能使用 AI 助教')) return
@@ -156,7 +180,8 @@ function clickFunc(f: { name: string; icon?: string; iconfont?: string }) {
   if (f.name === '视频/直播') {
     // 跳转到学习页的第一个章节（openStudy 内已校验权限）
     if (info.value.chapter && info.value.chapter.length > 0) {
-      openStudy(info.value.chapter[0].id)
+      const first = findFirstLeaf(info.value.chapter)
+      openStudy(first?.id || info.value.chapter[0].id)
     } else { uni.showToast({ title: '暂无视频内容', icon: 'none' }) }
     return
   }
@@ -263,6 +288,7 @@ async function handleFinalExam() {
 .ch-name { flex: 1; margin-left: 10px; font-size: 13px; color: $text-1; }
 .ch-btn { font-size: 11px; color: $bg-card; background: linear-gradient(135deg,$primary,$primary-light); padding: 4px 12px; border-radius: 12px; }
 .chapter-parent { display: flex; align-items: center; padding: 11px 0; border-bottom: 1px solid $border; gap: 8px; }
+.chapter-toggle-spacer { width: 14px; flex: 0 0 14px; }
 .chapter-parent-name { flex: 1; font-size: 13px; font-weight: 600; color: $text-1; }
 .chapter-count { font-size: 11px; color: $text-3; }
 .chapter-child { display: flex; align-items: center; padding: 9px 0 9px 22px; border-bottom: 1px solid $border; }
