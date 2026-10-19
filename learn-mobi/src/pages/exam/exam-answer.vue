@@ -176,9 +176,9 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { onLoad, onUnload } from '@dcloudio/uni-app'
-import { getExamDetail, getExamQuestions, submitExam, heartbeat, getExamResult } from '../../api/exam'
+import { getExamDetail, startExam, submitExam, heartbeat, getExamResult } from '../../api/exam'
 import { getExamStartData, clearExamStartData } from '../../utils/exam-cache'
-import type { ExamQuestionVO, ExamResultVO } from '../../types/exam'
+import type { ExamQuestionVO, ExamResultVO, StartExamVO } from '../../types/exam'
 
 /* ---------- 题型映射 ---------- */
 const typeLabels: Record<number, string> = { 0: '单选题', 1: '多选题', 2: '判断题', 3: '简答题', 4: '填空题' }
@@ -272,19 +272,9 @@ onUnload(() => {
 
 async function loadData() {
   try {
-    const [exam, qs] = await Promise.all([
-      getExamDetail(examId.value),
-      getExamQuestions(examId.value),
-    ])
-    if (exam) {
-      examTitle.value = exam.name
-      examDurationMin.value = exam.duration
-    }
-    questions.value = qs
-    if (qs.length > 0) {
-      startTimer(exam?.duration || 90)
-      nextTick(restoreQuestionState)
-    }
+    const exam = await getExamDetail(examId.value)
+    isFinal.value = exam.isFinalExam === 1
+    applyStartData(await startExam(examId.value))
   } catch {
     uni.showToast({ title: '数据加载失败', icon: 'none' })
   } finally {
@@ -292,25 +282,34 @@ async function loadData() {
   }
 }
 
-/** 从启动缓存加载（结课考试） */
+function applyStartData(data: StartExamVO) {
+  recordId.value = data.recordId
+  examTitle.value = data.examName || (isFinal.value ? '结课考试' : '在线测试')
+  questions.value = data.questions
+  examDurationMin.value = data.duration
+  if (data.questions.length > 0) {
+    startTimerFromEndTime(data.endTime)
+    startHeartbeat(data.recordId)
+    nextTick(restoreQuestionState)
+  }
+}
+
+/** 从服务端开考缓存或现有记录恢复，不能用重新加载重置时限。 */
 async function loadFromRecord() {
   try {
     // 先检查缓存中是否有 startExam 返回的数据
     const startData = getExamStartData()
     if (startData && startData.recordId === recordId.value) {
-      examTitle.value = '结课考试'
-      questions.value = startData.questions
-      examDurationMin.value = startData.duration
       clearExamStartData()
-      if (startData.questions.length > 0) {
-        startTimerFromEndTime(startData.endTime)
-        startHeartbeat(recordId.value)
-        nextTick(restoreQuestionState)
-      }
+      applyStartData(startData)
     } else {
       // 缓存不存在（如页面被重建），尝试加载结果
       const resultData = await getExamResult(recordId.value)
-      if (resultData) {
+      if (resultData?.status === 0 && examId.value) {
+        const resumed = await startExam(examId.value)
+        if (resumed.recordId !== recordId.value) throw new Error('record changed')
+        applyStartData(resumed)
+      } else if (resultData) {
         result.value = resultData
         submitted.value = true
       } else {

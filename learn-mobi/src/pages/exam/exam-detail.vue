@@ -100,7 +100,7 @@
               </view>
               <view class="info-title-area">
                 <text class="exam-title">{{ detail.name }}</text>
-                <text class="exam-desc">{{ detail.introduction }}</text>
+                <text class="exam-desc">{{ htmlToText(detail.introduction) }}</text>
               </view>
             </view>
             <view class="exam-btn" @click="startNormalExam">
@@ -172,6 +172,7 @@ import { onLoad, onShow } from '@dcloudio/uni-app'
 import { getExamDetail, clearExamHistory, getCourseFinalExam, startExam } from '../../api/exam'
 import { setExamStartData } from '../../utils/exam-cache'
 import { requireLogin } from '../../utils/auth'
+import { htmlToText } from '../../utils/text'
 import type { ExamDetailVO, ExamHistoryVO, FinalExamVO } from '../../types/exam'
 
 const examId = ref(0)
@@ -181,6 +182,7 @@ const loading = ref(true)
 const detail = ref<ExamDetailVO | null>(null)
 const finalInfo = ref<FinalExamVO | null>(null)
 const historyList = ref<ExamHistoryVO[]>([])
+const starting = ref(false)
 
 onLoad((q: any) => {
   courseId.value = Number(q.courseId) || 0
@@ -196,9 +198,11 @@ onLoad((q: any) => {
 
 // 从答题页返回时刷新数据
 onShow(() => {
-  if (isFinal.value && courseId.value && examId.value) {
+  if (isFinal.value && courseId.value && examId.value && finalInfo.value) {
     loading.value = true
     loadFinalExam()
+  } else if (examId.value && detail.value && !isFinal.value) {
+    loadDetail()
   }
 })
 
@@ -221,6 +225,12 @@ async function loadFinalExam() {
 async function loadDetail() {
   try {
     const data = await getExamDetail(examId.value)
+    if (data?.isFinalExam === 1 && data.courseId) {
+      isFinal.value = true
+      courseId.value = data.courseId
+      await loadFinalExam()
+      return
+    }
     detail.value = data
     historyList.value = data?.historyList || []
   } catch {
@@ -231,23 +241,30 @@ async function loadDetail() {
 }
 
 async function startFinalExam() {
-  if (!requireLogin('登录后才能参加考试')) return
   if (!finalInfo.value?.canTake || !examId.value) return
+  await beginExam()
+}
+
+async function beginExam() {
+  if (starting.value || !requireLogin('登录后才能参加考试')) return
+  starting.value = true
   try {
     uni.showLoading({ title: '正在准备考试...', mask: true })
     const data = await startExam(examId.value)
     setExamStartData(data)
     uni.hideLoading()
-    uni.navigateTo({ url: `/pages/exam/exam-answer?recordId=${data.recordId}&examId=${examId.value}&duration=${data.duration}&final=1` })
+    await uni.navigateTo({ url: `/pages/exam/exam-answer?recordId=${data.recordId}&examId=${examId.value}&final=${isFinal.value ? 1 : 0}` })
   } catch {
     uni.hideLoading()
     uni.showToast({ title: '开考失败', icon: 'none' })
+  } finally {
+    starting.value = false
+    uni.hideLoading()
   }
 }
 
-function startNormalExam() {
-  if (!requireLogin('登录后才能参加考试')) return
-  uni.navigateTo({ url: `/pages/exam/exam-answer?id=${examId.value}` })
+async function startNormalExam() {
+  await beginExam()
 }
 
 async function handleClearHistory() {

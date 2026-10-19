@@ -14,6 +14,10 @@
         <u-loading-icon mode="circle" size="36"></u-loading-icon>
       </view>
 
+      <view v-else-if="loadError" class="center-wrap">
+        <text>{{ loadError }}</text>
+        <button @click="loadScore">重新加载</button>
+      </view>
       <view v-else-if="scoreData" class="content-wrap">
         <!-- 课程信息 -->
         <view class="course-header">
@@ -165,6 +169,7 @@ import type { CourseScoreVO } from '../../types/course'
 const cid = ref(0)
 const loading = ref(true)
 const scoreData = ref<CourseScoreVO | null>(null)
+const loadError = ref('')
 
 onLoad((q: any) => {
   cid.value = Number(q.courseId) || 0
@@ -176,10 +181,12 @@ onLoad((q: any) => {
 })
 
 async function loadScore() {
+  loading.value = true
+  loadError.value = ''
   try {
     scoreData.value = await getCourseScore(cid.value)
   } catch (e: any) {
-    uni.showToast({ title: e?.message || '加载失败', icon: 'none' })
+    loadError.value = e?.message || '综合成绩加载失败，请重试'
   } finally {
     loading.value = false
   }

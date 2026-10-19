@@ -14,6 +14,7 @@ export interface ExamVO {
   duration: number
   difficulty?: number
   isFinalExam?: number
+  attemptStatus?: 0 | 1 | 2
 }
 
 /** 考试详情 */
@@ -23,6 +24,7 @@ export interface ExamDetailVO {
   subtitle?: string
   courseId?: number
   courseName?: string
+  isFinalExam?: number
   duration: number
   totalScore: number
   passScore: number
@@ -64,6 +66,7 @@ export interface ExamQuestionVO {
 /** 考试结果 */
 export interface ExamResultVO {
   recordId: number
+  status?: number
   score: number
   totalScore: number
   passScore: number
@@ -117,6 +120,7 @@ export interface FinalExamVO {
 /** 开考返回 */
 export interface StartExamVO {
   recordId: number
+  examName?: string
   questions: ExamQuestionVO[]
   duration: number
   endTime: string

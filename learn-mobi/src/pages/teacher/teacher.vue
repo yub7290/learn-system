@@ -1,5 +1,8 @@
 <template>
   <view class="teacher-page">
+    <u-loading-icon v-if="loading" text="加载中"></u-loading-icon>
+    <view v-else-if="loadError" class="load-error" @click="loadData">{{ loadError }}，点击重试</view>
+    <template v-else>
     <!-- 教师详情模式（有 tid 参数） -->
     <template v-if="teacherInfo">
       <view class="teacher-info">
@@ -11,14 +14,14 @@
           <text class="info-name">{{ teacherInfo.name }}</text>
           <text class="info-title" v-if="teacherInfo.titleName">{{ teacherInfo.titleName }}</text>
           <view class="info-rating">
-            <u-rate :model-value="teacherInfo.rating || 5" :count="5" size="12" active-color="#ffb400" readonly></u-rate>
+            <u-rate :model-value="teacherInfo.rating || 0" :count="5" size="12" active-color="#ffb400" readonly></u-rate>
           </view>
         </view>
       </view>
 
       <view class="desc-block">
         <text class="block-title">老师简介</text>
-        <text class="desc-text">{{ teacherInfo.desc || '暂无简介' }}</text>
+        <text class="desc-text">{{ htmlToText(teacherInfo.desc) || '暂无简介' }}</text>
       </view>
 
       <!-- TA 的课程 -->
@@ -45,6 +48,7 @@
       </view>
       <u-empty v-else text="暂无教师数据" mode="data" margin-top="80"></u-empty>
     </template>
+    </template>
   </view>
 </template>
 
@@ -52,52 +56,42 @@
 import { ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import CourseCard from '../../components/CourseCard.vue'
-import { getTeacherList } from '../../api/teacher'
+import { getTeacherList, getTeacherDetail } from '../../api/teacher'
+import { htmlToText } from '../../utils/text'
 import type { TeacherListItem, TeacherInfoVO, TeacherCourseVO } from '../../types/teacher'
 import type { HomeCourseItem } from '../../types/home'
 
 const teacherList = ref<TeacherListItem[]>([])
 const teacherInfo = ref<TeacherInfoVO | null>(null)
 const teacherCourseList = ref<TeacherCourseVO[]>([])
+const teacherId = ref(0)
+const loading = ref(true)
+const loadError = ref('')
 
 onLoad((query: any) => {
-  const tid = Number(query?.tid)
-  if (tid) {
-    loadTeacherDetail(tid)
-  }
+  teacherId.value = Number(query?.tid) || 0
 })
 
-onShow(() => {
-  if (!teacherInfo.value) {
-    loadTeacherList()
-  }
-})
+onShow(loadData)
 
-async function loadTeacherList() {
+async function loadData() {
+  loading.value = true
+  loadError.value = ''
   try {
-    const res = await getTeacherList()
-    teacherList.value = res.list || []
-  } catch (e) { /* stub -> empty */ }
-}
-
-async function loadTeacherDetail(tid: number) {
-  // Mock教师详情数据 — 对接正式 API 后替换
-  setTimeout(() => {
-    teacherInfo.value = {
-      id: tid,
-      avatarUrl: '',
-      name: '张教授',
-      titleName: '高级讲师',
-      rating: 5,
-      desc: '从事教育工作15年，擅长数学和物理教学，善于启发学生思维，注重培养学生的逻辑推理能力。所带班级成绩优异，多次获得优秀教师称号。',
-      courseCount: 3,
-      studentCount: 1200,
+    if (teacherId.value) {
+      const res = await getTeacherDetail(teacherId.value)
+      teacherInfo.value = res.info || null
+      teacherCourseList.value = res.course || []
+      if (!teacherInfo.value) loadError.value = '教师不存在'
+    } else {
+      const res = await getTeacherList()
+      teacherList.value = res.list || []
     }
-    teacherCourseList.value = [
-      { id: 1, imageUrl: '', name: '高等数学基础', teacherName: '张教授', courseType: 1, feeType: '免费' },
-      { id: 2, imageUrl: '', name: '线性代数入门', teacherName: '张教授', courseType: 1, feeType: '试学' },
-    ]
-  }, 200)
+  } catch {
+    loadError.value = '教师资料加载失败'
+  } finally {
+    loading.value = false
+  }
 }
 
 function goTeacher(id: number) {
@@ -111,6 +105,7 @@ function goCourseDetail(item: HomeCourseItem | TeacherCourseVO) {
 
 <style scoped lang="scss">
 .teacher-page { min-height: 100vh; padding: 14px; background: $bg-page; }
+.load-error { padding: 48px 16px; text-align: center; color: $text-2; }
 
 /* ===== 名师列表 ===== */
 .teacher-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

@@ -47,11 +47,12 @@ import TabBar from '../../components/TabBar.vue'
 import ExamCard from '../../components/ExamCard.vue'
 import { getExamList } from '../../api/exam'
 import { requireLogin } from '../../utils/auth'
+import { examDetailUrl } from '../../utils/exam-route'
 import type { ExamVO } from '../../types/exam'
 
 /**
  * 考试状态枚举
- * 0=未开始  1=进行中  2=已结束
+ * 当前学员的作答状态：0=未作答  1=进行中  2=已完成
  */
 type ExamStatus = 0 | 1 | 2
 
@@ -62,40 +63,21 @@ interface TabItem {
 
 const tabs: TabItem[] = [
   { key: 'all', name: '全部' },
-  { key: 0, name: '未开始' },
+  { key: 0, name: '未作答' },
   { key: 1, name: '进行中' },
-  { key: 2, name: '已结束' },
+  { key: 2, name: '已完成' },
 ]
 
 const activeTab = ref<string | number>('all')
 const examList = ref<ExamVO[]>([])
 const loading = ref(false)
 
-/**
- * Mock 考试状态映射（正式环境由后端返回）
- * 为演示效果，给部分考试设置不同状态
- */
-const mockStatus: Record<number, ExamStatus> = {
-  1: 0, // 未开始
-  2: 1, // 进行中
-  3: 0, // 未开始
-  4: 1, // 进行中
-  5: 2, // 已结束
-  6: 2, // 已结束
-}
-
-/** 带状态的考试列表 */
-const allList = computed<Array<ExamVO & { status: ExamStatus }>>(() =>
-  examList.value.map((item) => ({
-    ...item,
-    status: mockStatus[item.id] ?? 0,
-  }))
-)
+const allList = computed(() => examList.value)
 
 /** 根据当前 Tab 过滤 */
 const filteredList = computed(() => {
   if (activeTab.value === 'all') return allList.value
-  return allList.value.filter((item) => item.status === activeTab.value)
+  return allList.value.filter((item) => item.attemptStatus === activeTab.value)
 })
 
 /** 切换 Tab */
@@ -116,12 +98,12 @@ async function loadList() {
 }
 
 function onLoadMore() {
-  // 预留加载更多; mock 数据暂不分页
+  // 列表分页由后续加载更多处理。
 }
 
 function handleCardClick(item: ExamVO) {
   if (!requireLogin('登录后才能查看考试详情')) return
-  uni.navigateTo({ url: `/pages/exam/exam-detail?id=${item.id}` })
+  uni.navigateTo({ url: examDetailUrl(item) })
 }
 
 onShow(loadList)

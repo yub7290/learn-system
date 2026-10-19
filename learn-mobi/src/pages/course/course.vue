@@ -2,7 +2,7 @@
   <view class="course-page">
     <view class="topbar">
       <u-icon name="list" color="#222" size="22" @click="drawerShow = true"></u-icon>
-      <u-search v-model="keyword" placeholder="搜索课程" :showAction="false" @search="doSearch" shape="round" bg-color="#f5f7fa"></u-search>
+      <u-search v-model="keyword" placeholder="搜索课程 / 老师" :showAction="false" @search="doSearch" @clear="doSearch" shape="round" bg-color="#f5f7fa"></u-search>
     </view>
 
     <u-tabs :list="tabList" :current="tabIndex" @click="onTabClick" line-color="#00c6ff" :scrollable="false" :active-style="{ color: '#00c6ff', fontWeight: 600 }"></u-tabs>
@@ -18,28 +18,17 @@
     <view class="drawer" :class="{ open: drawerShow }">
       <view class="drawer-title">课程分类</view>
       <scroll-view scroll-y class="drawer-scroll">
+        <view class="cate-item" :class="{ active: currentCateId === 0 }" @click="selectCate(0)">全部分类</view>
         <view
           class="cate-item"
-          v-for="c in categoryList"
+          v-for="c in categoryOptions"
           :key="c.id"
           :class="{ active: c.id === currentCateId }"
+          :style="{ paddingLeft: `${16 + c.depth * 18}px` }"
           @click="selectCate(c.id)"
         >
           <text>{{ c.name }}</text>
         </view>
-        <template v-for="c in categoryList" :key="'sub-' + c.id">
-          <view v-if="c.children && c.children.length" class="cate-sub-item">
-            <view
-              class="cate-child"
-              v-for="sub in c.children"
-              :key="sub.id"
-              :class="{ active: sub.id === currentCateId }"
-              @click="selectCate(sub.id)"
-            >
-              <text>{{ sub.name }}</text>
-            </view>
-          </view>
-        </template>
         <u-empty v-if="!categoryList.length" text="暂无分类" mode="list" margin-top="60"></u-empty>
       </scroll-view>
     </view>
@@ -49,18 +38,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { onShow, onReachBottom } from '@dcloudio/uni-app'
 import CourseCard from '../../components/CourseCard.vue'
 import TabBar from '../../components/TabBar.vue'
 import { getCourseCategory, getCourseList, searchCourse } from '../../api/course'
 import type { CategoryNode, CourseListItem } from '../../types/course'
+import { courseTabs } from '../../utils/course-tabs'
 
-const tabList = [{ name: '推荐' }, { name: '热门' }, { name: '直播' }, { name: '免费' }, { name: '会员' }]
+const tabList = courseTabs
 const tabIndex = ref(0)
 const keyword = ref('')
 const drawerShow = ref(false)
 const categoryList = ref<CategoryNode[]>([])
+const categoryOptions = computed(() => {
+  const rows: Array<CategoryNode & { depth: number }> = []
+  const walk = (nodes: CategoryNode[], depth: number) => {
+    nodes.forEach(node => { rows.push({ ...node, depth }); walk(node.children || [], depth + 1) })
+  }
+  walk(categoryList.value, 0)
+  return rows
+})
 const currentCateId = ref(0)
 const courseList = ref<CourseListItem[]>([])
 const page = ref(1)
@@ -77,10 +75,10 @@ async function loadList(reset = false) {
   try {
     let items: CourseListItem[] = []
     if (keyword.value) {
-      const res = await searchCourse({ keyword: keyword.value, cateId: currentCateId.value, tabType: tabIndex.value })
+      const res = await searchCourse({ keyword: keyword.value.trim(), cateId: currentCateId.value, tabType: tabList[tabIndex.value].type })
       items = res.list || []; courseList.value = items; loadStatus.value = 'nomore'
     } else {
-      const res = await getCourseList({ cateId: currentCateId.value, tabType: tabIndex.value, page: page.value, pageSize })
+      const res = await getCourseList({ cateId: currentCateId.value, tabType: tabList[tabIndex.value].type, page: page.value, pageSize })
       items = res.list || []; courseList.value = reset ? items : [...courseList.value, ...items]
       loadStatus.value = items.length < pageSize ? 'nomore' : 'loadmore'
     }
